@@ -676,7 +676,7 @@ class MPStaticSet(MPRelaxSet):
                 kpoints = Kpoints.gamma_automatic(kpoints.kpts[0])
         return kpoints
 
-    def override_from_prev_calc(self, prev_calc_dir='.'):
+    def override_from_prev_calc(self, prev_calc_dir='.', **kwargs):
         """
         Update the input set to include settings from a previous calculation.
 
@@ -698,7 +698,10 @@ class MPStaticSet(MPRelaxSet):
                           "files will be appropriate for the standardized "
                           "structure.")
 
-        self._structure = get_structure_from_prev_run(vasprun, outcar)
+        if not kwargs.get("structure", False):
+            self._structure = get_structure_from_prev_run(vasprun, outcar)
+        else:
+            self._structure = kwargs.get("structure")
 
         # multiply the reciprocal density if needed
         if self.small_gap_multiply:
@@ -723,7 +726,7 @@ class MPStaticSet(MPRelaxSet):
                 the prev_calc_dir.
         """
         input_set = cls(_dummy_structure, **kwargs)
-        return input_set.override_from_prev_calc(prev_calc_dir=prev_calc_dir)
+        return input_set.override_from_prev_calc(prev_calc_dir=prev_calc_dir, **kwargs)
 
 
 class MPHSEBSSet(MPHSERelaxSet):
