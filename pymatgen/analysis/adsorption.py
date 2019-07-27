@@ -631,8 +631,8 @@ color_dict = {el: [j / 256.001 for j in colors["Jmol"][el]]
               for el in colors["Jmol"].keys()}
 
 
-def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5,
-              draw_unit_cell=True, decay=0.2, adsorption_sites=True):
+def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5, draw_unit_cell=True,
+              decay=0.2, adsorption_sites=True, find_args=None):
     """
     Function that helps visualize the slab in a 2-D plot, for
     convenient viewing of output of AdsorbateSiteFinder.
@@ -646,6 +646,8 @@ def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5,
             a fraction of the unit cell limits
         draw_unit_cell (bool): flag indicating whether or not to draw cell
         decay (float): how the alpha-value decays along the z-axis
+        find_args (dict): dictionary of arguments to be passed to the
+                call to AdsorbateSiteFinder(orig_slab).find_adsorption_sites
     """
     orig_slab = slab.copy()
     slab = reorient_z(slab)
@@ -671,8 +673,9 @@ def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5,
                                     edgecolor='k', lw=0.3, zorder=2 * n + 1))
     # Adsorption sites
     if adsorption_sites:
+        find_args = find_args or {}
         asf = AdsorbateSiteFinder(orig_slab)
-        ads_sites = asf.find_adsorption_sites()['all']
+        ads_sites = asf.find_adsorption_sites(**find_args)['all']
         sop = get_rot(orig_slab)
         ads_sites = [sop.operate(ads_site)[:2].tolist()
                      for ads_site in ads_sites]
