@@ -2192,7 +2192,7 @@ class MPSurfaceSet(MVLSlabSet):
         ldau = bool(non_adsorbate_elts & ldau_elts)
 
         # Should give better forces for optimization
-        incar_config = {"EDIFFG": -0.05, "ENAUG": 4000, "IBRION": 1,
+        incar_config = {"EDIFFG": -0.05, "ENAUG": 4000, "IBRION": 2,
                         "POTIM": 1.0, "LDAU": ldau, "EDIFF": 1e-5, "ISYM": 0}
         incar.update(incar_config)
         incar.update(self.user_incar_settings)
