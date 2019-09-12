@@ -384,7 +384,8 @@ class AdsorbateSiteFinder:
             repeat (3-tuple or list): input for making a supercell of slab
                 prior to placing the adsorbate
             translate (bool): flag on whether to translate the molecule so
-                that its CoM is at the origin prior to adding it to the surface
+                that the CoM of the atoms that have the most negative z
+                coordinate is at the origin prior to adding it to the surface
             reorient (bool): flag on whether to reorient the molecule to
                 have its z-axis concurrent with miller index
         """
@@ -444,7 +445,8 @@ class AdsorbateSiteFinder:
             min_lw (float): minimum length and width of the slab, only used
                 if repeat is None
             translate (bool): flag on whether to translate the molecule so
-                that its CoM is at the origin prior to adding it to the surface
+                that the CoM of the atoms that have the most negative z
+                coordinate is at the origin prior to adding it to the surface
             reorient (bool): flag on whether or not to reorient adsorbate
                 along the miller index
             find_args (dict): dictionary of arguments to be passed to the
