@@ -370,8 +370,8 @@ class AdsorbateSiteFinder:
             return np.average([site_list[i].frac_coords for i in indices],
                               axis=0)
 
-    def add_adsorbate(self, molecule, ads_coord, repeat=None, translate=True,
-                      reorient=True):
+    def add_adsorbate(self, molecule, ads_coord, repeat=None, min_lw=5.0,
+                      translate=True, reorient=True):
         """
         Adds an adsorbate at a particular coordinate.  Adsorbate
         represented by a Molecule object and is translated to (0, 0, 0) if
@@ -383,6 +383,8 @@ class AdsorbateSiteFinder:
             ads_coord (array): coordinate of adsorbate position
             repeat (3-tuple or list): input for making a supercell of slab
                 prior to placing the adsorbate
+            min_lw (float): minimum length and width of the slab, only used
+                if repeat is None
             translate (bool): flag on whether to translate the molecule so
                 that the CoM of the atoms that have the most negative z
                 coordinate is at the origin prior to adding it to the surface
@@ -390,6 +392,10 @@ class AdsorbateSiteFinder:
                 have its z-axis concurrent with miller index
         """
         molecule = molecule.copy()
+        if repeat is None:
+            xrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[0]))
+            yrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[1]))
+            repeat = [xrep, yrep, 1]
         if translate:
             # Translate the molecule so that the center of mass of the atoms
             # that have the most negative z coordinate is at (0, 0, 0)
@@ -452,16 +458,14 @@ class AdsorbateSiteFinder:
             find_args (dict): dictionary of arguments to be passed to the
                 call to self.find_adsorption_sites, e.g. {"distance":2.0}
         """
-        if repeat is None:
-            xrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[0]))
-            yrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[1]))
-            repeat = [xrep, yrep, 1]
         structs = []
 
         find_args = find_args or {}
         for coords in self.find_adsorption_sites(**find_args)['all']:
-            structs.append(self.add_adsorbate(molecule, coords,
-                                              repeat=repeat, translate=translate, reorient=reorient))
+            structs.append(
+                self.add_adsorbate(
+                    molecule, coords, repeat=repeat, min_lw=min_lw,
+                    translate=translate, reorient=reorient))
         return structs
 
     def adsorb_both_surfaces(self, molecule, repeat=None, min_lw=5.0,
