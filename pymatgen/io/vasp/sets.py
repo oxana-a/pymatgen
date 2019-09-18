@@ -26,6 +26,7 @@ Read the following carefully before implementing new input sets:
    MPStaticSet or MPNonSCFSets are constructed.
 
 The above are recommendations. The following are UNBREAKABLE rules:
+
 1. All input sets must take in a structure or list of structures as the first
    argument.
 2. user_incar_settings, user_kpoints_settings and user_<whatever>_settings are
@@ -224,8 +225,8 @@ class DictSet(VaspInputSet):
 
             If a None value is given, that key is unset. For example,
             {"ENCUT": None} will remove ENCUT from the incar settings.
-        user_kpoints_settings (dict or Kpoints): Allow user to override kpoints 
-            setting by supplying a dict E.g., {"reciprocal_density": 1000}. 
+        user_kpoints_settings (dict or Kpoints): Allow user to override kpoints
+            setting by supplying a dict E.g., {"reciprocal_density": 1000}.
             User can also supply Kpoints object. Default is None.
         user_potcar_settings (dict: Allow user to override POTCARs. E.g.,
             {"Gd": "Gd_3"}. This is generally not recommended. Default is None.
@@ -713,7 +714,7 @@ class MPStaticSet(MPRelaxSet):
         return self
 
     @classmethod
-    def from_prev_calc(cls, prev_calc_dir,  **kwargs):
+    def from_prev_calc(cls, prev_calc_dir, **kwargs):
         """
         Generate a set of Vasp input files for static calculations from a
         directory of previous Vasp run.
@@ -783,7 +784,7 @@ class MPHSEBSSet(MPHSERelaxSet):
             self.reciprocal_density = 50
         else:
             self.reciprocal_density = reciprocal_density or \
-                self.user_kpoints_settings['reciprocal_density']
+                                      self.user_kpoints_settings['reciprocal_density']
 
         self.kpoints_line_density = kpoints_line_density
         self.copy_chgcar = copy_chgcar
@@ -953,7 +954,7 @@ class MPNonSCFSet(MPRelaxSet):
             incar.update({k: v for k, v in self.prev_incar.items()})
 
         # Overwrite necessary INCAR parameters from previous runs
-        incar.update({"IBRION": -1,  "LCHARG": False, "LORBIT": 11,
+        incar.update({"IBRION": -1, "LCHARG": False, "LORBIT": 11,
                       "LWAVE": False, "NSW": 0, "ISYM": 0, "ICHARG": 11})
 
         if self.mode.lower() == 'uniform':
@@ -1690,7 +1691,6 @@ class MVLRelax52Set(DictSet):
     CONFIG = _load_yaml_config("MVLRelax52Set")
 
     def __init__(self, structure, potcar_functional="PBE_52", **kwargs):
-
         if potcar_functional not in ["PBE_52", "PBE_54"]:
             raise ValueError("Please select from PBE_52 and PBE_54!")
 
@@ -1824,7 +1824,6 @@ class MITMDSet(MITRelaxSet):
 
     def __init__(self, structure, start_temp, end_temp, nsteps, time_step=2,
                  spin_polarized=False, **kwargs):
-
         # MD default settings
         defaults = {'TEBEG': start_temp, 'TEEND': end_temp, 'NSW': nsteps,
                     'EDIFF_PER_ATOM': 0.000001, 'LSCALU': False,
@@ -2010,6 +2009,45 @@ class MVLScanRelaxSet(MPRelaxSet):
                                            "LDAU": False,
                                            "METAGGA": "SCAN",
                                            "NELM": 200})
+
+
+class MPSurfaceSet(MVLSlabSet):
+    """
+    Input class for MP slab calcs, mostly to change parameters
+    and defaults slightly
+    """
+    def __init__(self, structure, bulk=False, auto_dipole=None, **kwargs):
+
+        # If not a bulk calc, turn get_locpot/auto_dipole on by default
+        auto_dipole = auto_dipole or not bulk
+        super(MPSurfaceSet, self).__init__(
+            structure, bulk=bulk, auto_dipole=False, **kwargs)
+        # This is a hack, but should be fixed when this is ported over to
+        # pymatgen to account for vasp native dipole fix
+        if auto_dipole:
+            self._config_dict['INCAR'].update({"LDIPOL": True, "IDIPOL": 3})
+            self.auto_dipole = True
+
+    @property
+    def incar(self):
+        incar = super(MPSurfaceSet, self).incar
+
+        # Determine LDAU based on slab chemistry without adsorbates
+        ldau_elts = {'O', 'F'}
+        if self.structure.site_properties.get("surface_properties"):
+            non_adsorbate_elts = {
+                s.specie.symbol for s in self.structure
+                if not s.properties['surface_properties'] == 'adsorbate'}
+        else:
+            non_adsorbate_elts = {s.specie.symbol for s in self.structure}
+        ldau = bool(non_adsorbate_elts & ldau_elts)
+
+        # Should give better forces for optimization
+        incar_config = {"EDIFFG": -0.05, "ENAUG": 4000, "IBRION": 1,
+                        "POTIM": 1.0, "LDAU": ldau, "EDIFF": 1e-5, "ISYM": 0}
+        incar.update(incar_config)
+        incar.update(self.user_incar_settings)
+        return incar
 
 
 def get_vasprun_outcar(path, parse_dos=True, parse_eigen=True):

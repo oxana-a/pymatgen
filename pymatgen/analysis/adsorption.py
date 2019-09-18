@@ -66,9 +66,6 @@ class AdsorbateSiteFinder:
                 concurrent with the miller index, this enables use with
                 slabs that have been reoriented, but the miller vector
                 must be supplied manually
-            top_surface (bool): Which surface to adsorb, True for the surface
-                above the center of mass, False for the surface below
-                center of mass
 
         """
         # get surface normal from miller index
@@ -373,11 +370,11 @@ class AdsorbateSiteFinder:
             return np.average([site_list[i].frac_coords for i in indices],
                               axis=0)
 
-    def add_adsorbate(self, molecule, ads_coord, repeat=None, translate=True,
-                      reorient=True):
+    def add_adsorbate(self, molecule, ads_coord, repeat=None, min_lw=5.0,
+                      translate=True, reorient=True):
         """
         Adds an adsorbate at a particular coordinate.  Adsorbate
-        represented by a Molecule object and is translated to (0, 0, 0) if 
+        represented by a Molecule object and is translated to (0, 0, 0) if
         translate is True, or positioned relative to the input adsorbate
         coordinate if translate is False.
 
@@ -386,22 +383,29 @@ class AdsorbateSiteFinder:
             ads_coord (array): coordinate of adsorbate position
             repeat (3-tuple or list): input for making a supercell of slab
                 prior to placing the adsorbate
+            min_lw (float): minimum length and width of the slab, only used
+                if repeat is None
             translate (bool): flag on whether to translate the molecule so
-                that its CoM is at the origin prior to adding it to the surface
+                that the CoM of the atoms that have the most negative z
+                coordinate is at the origin prior to adding it to the surface
             reorient (bool): flag on whether to reorient the molecule to
                 have its z-axis concurrent with miller index
         """
         molecule = molecule.copy()
+        if repeat is None:
+            xrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[0]))
+            yrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[1]))
+            repeat = [xrep, yrep, 1]
         if translate:
             # Translate the molecule so that the center of mass of the atoms
             # that have the most negative z coordinate is at (0, 0, 0)
             front_atoms = molecule.copy()
             front_atoms._sites = [s for s in molecule.sites
                                   if s.coords[2] == min([s.coords[2]
-                                  for s in molecule.sites])]
+                                                         for s in molecule.sites])]
             x, y, z = front_atoms.center_of_mass
             molecule.translate_sites(vector=[-x, -y, -z])
-        if reorient:    
+        if reorient:
             # Reorient the molecule along slab m_index
             sop = get_rot(self.slab)
             molecule.apply_operation(sop.inverse)
@@ -435,7 +439,7 @@ class AdsorbateSiteFinder:
         return slab.copy(site_properties=new_sp)
 
     def generate_adsorption_structures(self, molecule, repeat=None, min_lw=5.0,
-                                       translate=True, reorient=True, find_args={}):
+                                       translate=True, reorient=True, find_args=None):
         """
         Function that generates all adsorption structures for a given
         molecular adsorbate.  Can take repeat argument or minimum
@@ -446,24 +450,26 @@ class AdsorbateSiteFinder:
             repeat (3-tuple or list): repeat argument for supercell generation
             min_lw (float): minimum length and width of the slab, only used
                 if repeat is None
+            translate (bool): flag on whether to translate the molecule so
+                that the CoM of the atoms that have the most negative z
+                coordinate is at the origin prior to adding it to the surface
             reorient (bool): flag on whether or not to reorient adsorbate
                 along the miller index
             find_args (dict): dictionary of arguments to be passed to the
                 call to self.find_adsorption_sites, e.g. {"distance":2.0}
         """
-        if repeat is None:
-            xrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[0]))
-            yrep = np.ceil(min_lw / np.linalg.norm(self.slab.lattice.matrix[1]))
-            repeat = [xrep, yrep, 1]
         structs = []
 
+        find_args = find_args or {}
         for coords in self.find_adsorption_sites(**find_args)['all']:
-            structs.append(self.add_adsorbate(molecule, coords, 
-                repeat=repeat, translate=translate, reorient=reorient))
+            structs.append(
+                self.add_adsorbate(
+                    molecule, coords, repeat=repeat, min_lw=min_lw,
+                    translate=translate, reorient=reorient))
         return structs
 
     def adsorb_both_surfaces(self, molecule, repeat=None, min_lw=5.0,
-                             translate=True, reorient=True, find_args={}):
+                             translate=True, reorient=True, find_args=None):
         """
         Function that generates all adsorption structures for a given
         molecular adsorbate on both surfaces of a slab. This is useful
@@ -482,6 +488,7 @@ class AdsorbateSiteFinder:
         """
 
         # Get the adsorbed surfaces first
+        find_args = find_args or {}
         adslabs = self.generate_adsorption_structures(molecule, repeat=repeat,
                                                       min_lw=min_lw,
                                                       translate=translate,
@@ -515,7 +522,7 @@ class AdsorbateSiteFinder:
 
         return new_adslabs
 
-    def generate_substitution_structures(self, atom, target_species=[],
+    def generate_substitution_structures(self, atom, target_species=None,
                                          sub_both_sides=False, range_tol=1e-2,
                                          dist_from_surf=0):
         """
@@ -534,6 +541,8 @@ class AdsorbateSiteFinder:
                 substitution sites, defaults to 0 to substitute at the surface
         """
 
+        target_species = target_species or []
+
         # Get symmetrized structure in case we want to substitue both sides
         sym_slab = SpacegroupAnalyzer(self.slab).get_symmetrized_structure()
 
@@ -547,7 +556,7 @@ class AdsorbateSiteFinder:
                               sym_slab.equivalent_indices if i in indices][0]
                 for ii in eq_indices:
                     if "%.6f" % (sym_slab[ii].frac_coords[2]) != \
-                                    "%.6f" % (site.frac_coords[2]):
+                            "%.6f" % (site.frac_coords[2]):
                         props["surface_properties"][ii] = "substitute"
                         slab.replace(ii, atom)
                         break
@@ -631,8 +640,8 @@ color_dict = {el: [j / 256.001 for j in colors["Jmol"][el]]
               for el in colors["Jmol"].keys()}
 
 
-def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5,
-              draw_unit_cell=True, decay=0.2, adsorption_sites=True):
+def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5, draw_unit_cell=True,
+              decay=0.2, adsorption_sites=True, find_args=None):
     """
     Function that helps visualize the slab in a 2-D plot, for
     convenient viewing of output of AdsorbateSiteFinder.
@@ -646,6 +655,8 @@ def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5,
             a fraction of the unit cell limits
         draw_unit_cell (bool): flag indicating whether or not to draw cell
         decay (float): how the alpha-value decays along the z-axis
+        find_args (dict): dictionary of arguments to be passed to the
+                call to AdsorbateSiteFinder(orig_slab).find_adsorption_sites
     """
     orig_slab = slab.copy()
     slab = reorient_z(slab)
@@ -671,8 +682,9 @@ def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5,
                                     edgecolor='k', lw=0.3, zorder=2 * n + 1))
     # Adsorption sites
     if adsorption_sites:
+        find_args = find_args or {}
         asf = AdsorbateSiteFinder(orig_slab)
-        ads_sites = asf.find_adsorption_sites()['all']
+        ads_sites = asf.find_adsorption_sites(**find_args)['all']
         sop = get_rot(orig_slab)
         ads_sites = [sop.operate(ads_site)[:2].tolist()
                      for ads_site in ads_sites]
