@@ -2,6 +2,10 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
+"""
+This module implements plotter for DOS and band structure.
+"""
+
 import logging
 import math
 import itertools
@@ -9,11 +13,16 @@ import warnings
 from collections import OrderedDict
 
 import numpy as np
-
 from monty.json import jsanitize
+from monty.dev import requires
+
+try:
+    from mayavi import mlab
+except ImportError:
+    mlab = None
 
 from pymatgen.core.periodic_table import Element
-from pymatgen.electronic_structure.core import Spin, Orbital, OrbitalType
+from pymatgen.electronic_structure.core import Spin, OrbitalType
 from pymatgen.electronic_structure.bandstructure import BandStructureSymmLine
 from pymatgen.util.plotting import pretty_plot, \
     add_fig_kwargs, get_ax3d_fig_plt
@@ -21,11 +30,6 @@ from collections import Counter
 import copy
 
 from pymatgen.electronic_structure.boltztrap import BoltztrapError
-from pymatgen.symmetry.bandstructure import HighSymmKpath
-
-"""
-This module implements plotter for DOS and band structure.
-"""
 
 __author__ = "Shyue Ping Ong, Geoffroy Hautier, Anubhav Jain"
 __copyright__ = "Copyright 2012, The Materials Project"
@@ -54,18 +58,19 @@ class DosPlotter:
         # form returned by CompleteDos.get_spd/element/others_dos().
         plotter.add_dos_dict({"dos1": dos1, "dos2": dos2})
         plotter.add_dos_dict(complete_dos.get_spd_dos())
-
-    Args:
-        zero_at_efermi: Whether to shift all Dos to have zero energy at the
-            fermi energy. Defaults to True.
-        stack: Whether to plot the DOS as a stacked area graph
-        key_sort_func: function used to sort the dos_dict keys.
-        sigma: A float specifying a standard deviation for Gaussian smearing
-            the DOS for nicer looking plots. Defaults to None for no
-            smearing.
     """
 
     def __init__(self, zero_at_efermi=True, stack=False, sigma=None):
+        """
+        Args:
+            zero_at_efermi: Whether to shift all Dos to have zero energy at the
+                fermi energy. Defaults to True.
+            stack: Whether to plot the DOS as a stacked area graph
+            key_sort_func: function used to sort the dos_dict keys.
+            sigma: A float specifying a standard deviation for Gaussian smearing
+                the DOS for nicer looking plots. Defaults to None for no
+                smearing.
+        """
         self.zero_at_efermi = zero_at_efermi
         self.stack = stack
         self.sigma = sigma
@@ -243,12 +248,13 @@ class DosPlotter:
 class BSPlotter:
     """
     Class to plot or get data to facilitate the plot of band structure objects.
-
-    Args:
-        bs: A BandStructureSymmLine object.
     """
 
     def __init__(self, bs):
+        """
+        Args:
+            bs: A BandStructureSymmLine object.
+        """
         if not isinstance(bs, BandStructureSymmLine):
             raise ValueError(
                 "BSPlotter only works with BandStructureSymmLine objects. "
@@ -414,7 +420,6 @@ class BSPlotter:
                 Default is None such that no tolerance will be used.
         """
         plt = pretty_plot(12, 8)
-        from matplotlib import rc
         import scipy.interpolate as scint
 
         # main internal config options
@@ -694,12 +699,13 @@ class BSPlotterProjected(BSPlotter):
     """
     Class to plot or get data to facilitate the plot of band structure objects
     projected along orbitals, elements or sites.
-
-    Args:
-        bs: A BandStructureSymmLine object with projections.
     """
 
     def __init__(self, bs):
+        """
+        Args:
+            bs: A BandStructureSymmLine object with projections.
+        """
         if len(bs.projections) == 0:
             raise ValueError("try to plot projections"
                              " on a band structure without any")
@@ -1407,7 +1413,6 @@ class BSPlotterProjected(BSPlotter):
                 "The number of sub-figures %s might be too manny and the implementation might take a long time.\n"
                 "A smaller number or a plot with selected symmetry lines (selected_branches) might be better.\n"
                 % str(number_figs))
-        import math
         from pymatgen.util.plotting import pretty_plot
         band_linewidth = 0.5
         plt = pretty_plot(w_h_size[0], w_h_size[1])
@@ -2528,12 +2533,13 @@ class BoltztrapPlotter:
     # TODO: We need a unittest for this. Come on folks.
     """
     class containing methods to plot the data from Boltztrap.
-
-    Args:
-        bz: a BoltztrapAnalyzer object
     """
 
     def __init__(self, bz):
+        """
+        Args:
+            bz: a BoltztrapAnalyzer object
+        """
         self._bz = bz
 
     def _plot_doping(self, temp):
@@ -2905,7 +2911,6 @@ class BoltztrapPlotter:
             a matplotlib object
         """
         import matplotlib.pyplot as plt
-        import matplotlib.ticker as mtick
 
         if output == 'average':
             cond = self._bz.get_conductivity(relaxation_time=relaxation_time,
@@ -3436,17 +3441,16 @@ class CohpPlotter:
     Class for plotting crystal orbital Hamilton populations (COHPs) or
     crystal orbital overlap populations (COOPs). It is modeled after the
     DosPlotter object.
-
-    Args/attributes:
-        zero_at_efermi: Whether to shift all populations to have zero
-            energy at the Fermi level. Defaults to True.
-
-        are_coops: Switch to indicate that these are COOPs, not COHPs.
-            Defaults to False for COHPs.
-
     """
 
     def __init__(self, zero_at_efermi=True, are_coops=False):
+        """
+        Args:
+            zero_at_efermi: Whether to shift all populations to have zero
+                energy at the Fermi level. Defaults to True.
+            are_coops: Switch to indicate that these are COOPs, not COHPs.
+                Defaults to False for COHPs.
+        """
         self.zero_at_efermi = zero_at_efermi
         self.are_coops = are_coops
         self._cohps = OrderedDict()
@@ -3648,79 +3652,95 @@ class CohpPlotter:
         plt.show()
 
 
-def plot_fermi_surface(data, structure, cbm, energy_levels=[],
-                       multiple_figure=True,
-                       mlab_figure=None, kpoints_dict={}, color=(0, 0, 1),
-                       transparency_factor=[], labels_scale_factor=0.05,
-                       points_scale_factor=0.02, interative=True):
+@requires(mlab is not None, "MayAvi mlab not imported! Please install mayavi.")
+def plot_fermi_surface(data, structure, cbm, energy_levels=None,
+                       multiple_figure=True, mlab_figure=None,
+                       kpoints_dict=None, colors=None, transparency_factor=None,
+                       labels_scale_factor=0.05, points_scale_factor=0.02,
+                       interative=True):
     """
-    Plot the Fermi surface at specific energy value.
+    Plot the Fermi surface at specific energy value using Boltztrap 1 FERMI
+    mode.
+
+    The easiest way to use this plotter is:
+
+        1. Run boltztrap in 'FERMI' mode using BoltztrapRunner,
+        2. Load BoltztrapAnalyzer using your method of choice (e.g., from_files)
+        3. Pass in your BoltztrapAnalyzer's fermi_surface_data as this
+            function's data argument.
 
     Args:
-        data: energy values in a 3D grid from a CUBE file
-              via read_cube_file function, or from a
-              BoltztrapAnalyzer.fermi_surface_data
+        data: energy values in a 3D grid from a CUBE file via read_cube_file
+            function, or from a BoltztrapAnalyzer.fermi_surface_data
         structure: structure object of the material
-        energy_levels: list of energy value of the fermi surface.
-                       By default 0 eV correspond to the VBM, as in
-                       the plot of band structure along symmetry line.
-                       Default: max energy value + 0.01 eV
-        cbm: Boolean value to specify if the considered band is
-             a conduction band or not
-        multiple_figure: if True a figure for each energy level will be shown.
-                         If False all the surfaces will be shown in the same figure.
-                         In this las case, tune the transparency factor.
-        mlab_figure: provide a previous figure to plot a new surface on it.
-        kpoints_dict: dictionary of kpoints to show in the plot.
-                      example: {"K":[0.5,0.0,0.5]},
-                      where the coords are fractional.
-        color: tuple (r,g,b) of integers to define the color of the surface.
-        transparency_factor: list of values in the range [0,1] to tune
-                             the opacity of the surfaces.
-        labels_scale_factor: factor to tune the size of the kpoint labels
-        points_scale_factor: factor to tune the size of the kpoint points
-        interative: if True an interactive figure will be shown.
-                    If False a non interactive figure will be shown, but
-                    it is possible to plot other surfaces on the same figure.
-                    To make it interactive, run mlab.show().
-
+        energy_levels ([float]): Energy values for plotting the fermi surface(s)
+            By default 0 eV correspond to the VBM, as in the plot of band
+            structure along symmetry line.
+            Default: One surface, with max energy value + 0.01 eV
+        cbm (bool): Boolean value to specify if the considered band is a
+            conduction band or not
+        multiple_figure (bool): If True a figure for each energy level will be
+            shown.  If False all the surfaces will be shown in the same figure.
+            In this last case, tune the transparency factor.
+        mlab_figure (mayavi.mlab.figure): A previous figure to plot a new
+            surface on.
+        kpoints_dict (dict): dictionary of kpoints to label in the plot.
+            Example: {"K":[0.5,0.0,0.5]}, coords are fractional
+        colors ([tuple]): Iterable of 3-tuples (r,g,b) of integers to define
+            the colors of each surface (one per energy level).
+            Should be the same length as the number of surfaces being plotted.
+            Example (3 surfaces): colors=[(1,0,0), (0,1,0), (0,0,1)]
+            Example (2 surfaces): colors=[(0, 0.5, 0.5)]
+        transparency_factor [float]: Values in the range [0,1] to tune the
+            opacity of each surface. Should be one transparency_factor per
+            surface.
+        labels_scale_factor (float): factor to tune size of the kpoint labels
+        points_scale_factor (float): factor to tune size of the kpoint points
+        interative (bool): if True an interactive figure will be shown.
+            If False a non interactive figure will be shown, but it is possible
+            to plot other surfaces on the same figure. To make it interactive,
+            run mlab.show().
     Returns:
-        a Mayavi figure and a mlab module to control the plot.
+        ((mayavi.mlab.figure, mayavi.mlab)): The mlab plotter and an interactive
+            figure to control the plot.
 
     Note: Experimental.
           Please, double check the surface shown by using some
           other software and report issues.
     """
-
-    try:
-        from mayavi import mlab
-    except ImportError:
-        raise BoltztrapError(
-            "Mayavi package should be installed to use this function")
-
     bz = structure.lattice.reciprocal_lattice.get_wigner_seitz_cell()
     cell = structure.lattice.reciprocal_lattice.matrix
 
     fact = 1 if not cbm else -1
-    en_min = np.min(fact * data.ravel())
-    en_max = np.max(fact * data.ravel())
+    data_1d = data.ravel()
+    en_min = np.min(fact * data_1d)
+    en_max = np.max(fact * data_1d)
 
-    if energy_levels == []:
+    if energy_levels is None:
         energy_levels = [en_min + 0.01] if cbm else [en_max - 0.01]
         print("Energy level set to: " + str(energy_levels[0]) + " eV")
 
     else:
         for e in energy_levels:
             if e > en_max or e < en_min:
-                raise BoltztrapError("energy level " + str(e) +
-                                     " not in the range of possible energies: [" +
-                                     str(en_min) + ", " + str(en_max) + "]")
+                raise BoltztrapError(
+                    "energy level " + str(e) +
+                    " not in the range of possible energies: [" +
+                    str(en_min) + ", " + str(en_max) + "]"
+                )
 
-    if transparency_factor == []:
-        transparency_factor = [1] * len(energy_levels)
+    n_surfaces = len(energy_levels)
+    if colors is None:
+        colors = [(0, 0, 1)] * n_surfaces
+
+    if transparency_factor is None:
+        transparency_factor = [1] * n_surfaces
 
     if mlab_figure:
         fig = mlab_figure
+
+    if kpoints_dict is None:
+        kpoints_dict = {}
 
     if mlab_figure is None and not multiple_figure:
         fig = mlab.figure(size=(1024, 768), bgcolor=(1, 1, 1))
@@ -3741,7 +3761,9 @@ def plot_fermi_surface(data, structure, cbm, energy_levels=[],
             mlab.text3d(*label_coords, text=label, scale=labels_scale_factor,
                         color=(0, 0, 0), figure=fig)
 
-    for isolevel, alpha in zip(energy_levels, transparency_factor):
+    for i, isolevel in enumerate(energy_levels):
+        alpha = transparency_factor[i]
+        color = colors[i]
         if multiple_figure:
             fig = mlab.figure(size=(1024, 768), bgcolor=(1, 1, 1))
 
@@ -3780,6 +3802,7 @@ def plot_fermi_surface(data, structure, cbm, energy_levels=[],
 
         # mlab.view(distance='auto')
         fig.scene.isometric_view()
+
     if interative:
         mlab.show()
 
