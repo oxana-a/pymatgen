@@ -56,10 +56,8 @@ class DDEC6Analysis:
         self.coords = []
         self.bond_orders = {}
         self.potcar = None
-        self.chgcar = Chgcar.from_file(
-            chgcar_filename if gzipped else chgcar_filename[:-3])
-        self.potcar = Potcar.from_file(
-            potcar_filename if gzipped else potcar_filename[:-3])
+        self.chgcar = Chgcar.from_file(chgcar_filename)
+        self.potcar = Potcar.from_file(potcar_filename)
 
         # Set paths
         self._chgcarpath = os.path.abspath(chgcar_filename)
