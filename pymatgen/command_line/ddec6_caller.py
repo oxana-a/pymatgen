@@ -60,10 +60,12 @@ class DDEC6Analysis:
         self.potcar = Potcar.from_file(potcar_filename)
 
         # Set paths
-        self._chgcarpath = os.path.abspath(chgcar_filename)
-        self._potcarpath = os.path.abspath(potcar_filename)
-        self._aeccarpaths = [os.path.abspath(aeccar) for aeccar in
-                             aeccar_filenames]
+        self._chgcarpath = os.path.abspath(chgcar_filename)+"/{}".format(
+            chgcar_filename)
+        self._potcarpath = os.path.abspath(potcar_filename)+"/{}".format(
+            potcar_filename)
+        self._aeccarpaths = [os.path.abspath(aeccar)+"/{}".format(
+            aeccar) for aeccar in aeccar_filenames]
 
         if run:
             self._execute_ddec6(ad_dir, custom_command,
