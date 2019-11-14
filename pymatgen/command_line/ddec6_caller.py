@@ -152,9 +152,11 @@ class DDEC6Analysis:
         :param element: (Element) Pymatgen element
         :return: atomic charge, or avg of atomic charge for an element
         '''
-        if index:
+        if index is not None:
+            print(index)
+            print(self.atomic_charges[index])
             return self.atomic_charges[index]
-        if element:
+        elif element is not None:
             charges = []
             for c_element, c_charges in zip(self.species, self.atomic_charges):
                 if c_element == element:
@@ -174,7 +176,7 @@ class DDEC6Analysis:
         for i, v in enumerate(self.chgcar.poscar.natoms):
             potcar_indices += [i] * v
         nelect = self.potcar[potcar_indices[atom_index]].nelectrons
-
+        print(nelect)
         return nelect+self.get_charge_transfer(index=atom_index)
 
     # def get_charge_transfer(self, index):
