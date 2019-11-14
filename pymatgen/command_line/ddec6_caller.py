@@ -56,10 +56,9 @@ class DDEC6Analysis:
         self.coords = []
         self.bond_orders = {}
         self.potcar = None
-        self.chgcar = Chgcar.from_file(
-            chgcar_filename if gzipped else chgcar_filename[:-3])
-        self.potcar = Potcar.from_file(
-            potcar_filename if gzipped else potcar_filename[:-3])
+
+        self.chgcar = Chgcar.from_file(chgcar_filename)
+        self.potcar = Potcar.from_file(potcar_filename)
 
         # Set paths
         self._chgcarpath = os.path.abspath(chgcar_filename)
@@ -147,16 +146,20 @@ class DDEC6Analysis:
         self._get_charge_info()
         self._get_bond_order_info()
 
-    def get_charge(self, index=None, element=None, ):
+
+    def get_charge_transfer(self, index=None, element=None, ):
         '''
         Get charge for a select index or average of charge for a Element
         :param index: (int) specie index
         :param element: (Element) Pymatgen element
         :return: atomic charge, or avg of atomic charge for an element
         '''
-        if index:
+
+        if index is not None:
+            print(index)
+            print(self.atomic_charges[index])
             return self.atomic_charges[index]
-        if element:
+        elif element is not None:
             charges = []
             for c_element, c_charges in zip(self.species, self.atomic_charges):
                 if c_element == element:
@@ -165,22 +168,19 @@ class DDEC6Analysis:
         else:
             return self.atomic_charges
 
-    def get_charge_transfer(self, index):
+    def get_charge(self, atom_index):
         '''
-        Calculates difference between the valence charge of an atomic specie
-        and its DDEC6 calculated charge
-        :param index: (int) specie index
-        :return: charge transfer
+           #     Calculates difference between the valence charge of an atomic specie
+           #     and its DDEC6 calculated charge
+           #     :param index: (int) specie index
+           #     :return: charge transfer
         '''
-        c_charge = self.atomic_charges[index]
-        c_element = self.species[index]
-        c_level = max(np.array(c_element.full_electronic_structure)[:, 0])
-        c_normal_charge = sum(np.array(
-            np.array(c_element.full_electronic_structure)[
-                np.array(c_element.full_electronic_structure)[:,
-                0] == c_level][:, 2],
-            dtype=int))
-        return c_normal_charge - c_charge
+        potcar_indices = []
+        for i, v in enumerate(self.chgcar.poscar.natoms):
+            potcar_indices += [i] * v
+        nelect = self.potcar[potcar_indices[atom_index]].nelectrons
+        print(nelect)
+        return nelect+self.get_charge_transfer(index=atom_index)
 
     def get_bond_order(self, index_from, index_to):
         '''
