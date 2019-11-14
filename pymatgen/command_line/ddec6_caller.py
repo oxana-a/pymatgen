@@ -145,7 +145,7 @@ class DDEC6Analysis:
         self._get_charge_info()
         self._get_bond_order_info()
 
-    def get_charge(self, index=None, element=None, ):
+    def get_charge_transfer(self, index=None, element=None, ):
         '''
         Get charge for a select index or average of charge for a Element
         :param index: (int) specie index
@@ -163,22 +163,36 @@ class DDEC6Analysis:
         else:
             return self.atomic_charges
 
-    def get_charge_transfer(self, index):
+    def get_charge(self, atom_index):
         '''
-        Calculates difference between the valence charge of an atomic specie
-        and its DDEC6 calculated charge
-        :param index: (int) specie index
-        :return: charge transfer
+           #     Calculates difference between the valence charge of an atomic specie
+           #     and its DDEC6 calculated charge
+           #     :param index: (int) specie index
+           #     :return: charge transfer
         '''
-        c_charge = self.atomic_charges[index]
-        c_element = self.species[index]
-        c_level = max(np.array(c_element.full_electronic_structure)[:, 0])
-        c_normal_charge = sum(np.array(
-            np.array(c_element.full_electronic_structure)[
-                np.array(c_element.full_electronic_structure)[:,
-                0] == c_level][:, 2],
-            dtype=int))
-        return c_normal_charge - c_charge
+        potcar_indices = []
+        for i, v in enumerate(self.chgcar.poscar.natoms):
+            potcar_indices += [i] * v
+        nelect = self.potcar[potcar_indices[atom_index]].nelectrons
+
+        return nelect+self.get_charge_transfer(index=atom_index)
+
+    # def get_charge_transfer(self, index):
+    #     '''
+    #     Calculates difference between the valence charge of an atomic specie
+    #     and its DDEC6 calculated charge
+    #     :param index: (int) specie index
+    #     :return: charge transfer
+    #     '''
+    #     c_charge = self.atomic_charges[index]
+    #     c_element = self.species[index]
+    #     c_level = max(np.array(c_element.full_electronic_structure)[:, 0])
+    #     c_normal_charge = sum(np.array(
+    #         np.array(c_element.full_electronic_structure)[
+    #             np.array(c_element.full_electronic_structure)[:,
+    #             0] == c_level][:, 2],
+    #         dtype=int))
+    #     return c_normal_charge - c_charge
 
     def get_bond_order(self, index_from, index_to):
         '''
