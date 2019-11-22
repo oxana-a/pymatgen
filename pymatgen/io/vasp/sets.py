@@ -764,7 +764,7 @@ class MPStaticSet(MPRelaxSet):
                 kpoints = Kpoints.gamma_automatic(kpoints.kpts[0])
         return kpoints
 
-    def override_from_prev_calc(self, prev_calc_dir='.'):
+    def override_from_prev_calc(self, prev_calc_dir='.', **kwargs):
         """
         Update the input set to include settings from a previous calculation.
 
@@ -786,7 +786,10 @@ class MPStaticSet(MPRelaxSet):
                           "files will be appropriate for the standardized "
                           "structure.")
 
-        self._structure = get_structure_from_prev_run(vasprun, outcar)
+        if not kwargs.get("structure", False):
+            self._structure = get_structure_from_prev_run(vasprun, outcar)
+        else:
+            self._structure = kwargs.get("structure")
 
         # multiply the reciprocal density if needed
         if self.small_gap_multiply:
@@ -811,7 +814,7 @@ class MPStaticSet(MPRelaxSet):
                 the prev_calc_dir.
         """
         input_set = cls(_dummy_structure, **kwargs)
-        return input_set.override_from_prev_calc(prev_calc_dir=prev_calc_dir)
+        return input_set.override_from_prev_calc(prev_calc_dir=prev_calc_dir, **kwargs)
 
 
 class MPHSEBSSet(MPHSERelaxSet):
@@ -2426,3 +2429,41 @@ def batch_write_input(structures, vasp_input_set=MPRelaxSet, output_dir=".",
 
 _dummy_structure = Structure([1, 0, 0, 0, 1, 0, 0, 0, 1], ['I'], [[0, 0, 0]],
                              site_properties={"magmom": [[0, 0, 1]]})
+
+class MPSurfaceSet(MVLSlabSet):
+    """
+    Input class for MP slab calcs, mostly to change parameters
+    and defaults slightly
+    """
+    def __init__(self, structure, bulk=False, auto_dipole=None, **kwargs):
+
+        # If not a bulk calc, turn get_locpot/auto_dipole on by default
+        auto_dipole = auto_dipole or not bulk
+        super(MPSurfaceSet, self).__init__(
+            structure, bulk=bulk, auto_dipole=False, **kwargs)
+        # This is a hack, but should be fixed when this is ported over to
+        # pymatgen to account for vasp native dipole fix
+        if auto_dipole:
+            self._config_dict['INCAR'].update({"LDIPOL": True, "IDIPOL": 3})
+            self.auto_dipole = True
+
+    @property
+    def incar(self):
+        incar = super(MPSurfaceSet, self).incar
+
+        # Determine LDAU based on slab chemistry without adsorbates
+        ldau_elts = {'O', 'F'}
+        if self.structure.site_properties.get("surface_properties"):
+            non_adsorbate_elts = {
+                s.specie.symbol for s in self.structure
+                if not s.properties['surface_properties'] == 'adsorbate'}
+        else:
+            non_adsorbate_elts = {s.specie.symbol for s in self.structure}
+        ldau = bool(non_adsorbate_elts & ldau_elts)
+
+        # Should give better forces for optimization
+        incar_config = {"EDIFFG": -0.05, "ENAUG": 4000, "IBRION": 2,
+                        "POTIM": 1.0, "LDAU": ldau, "EDIFF": 1e-5, "ISYM": 0}
+        incar.update(incar_config)
+        incar.update(self.user_incar_settings)
+        return incar
