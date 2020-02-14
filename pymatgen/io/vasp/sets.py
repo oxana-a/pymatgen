@@ -1034,12 +1034,8 @@ class MPStaticSet(MPRelaxSet):
                     kpoints = Kpoints.gamma_automatic(kpoints.kpts[0])
         return kpoints
 
-<<<<<<< HEAD
 
-    def override_from_prev_calc(self, prev_calc_dir="."):
-=======
     def override_from_prev_calc(self, prev_calc_dir='.', **kwargs):
->>>>>>> ebe9a4bb64326e98b43349f0181516ade2a2b66a
         """
         Update the input set to include settings from a previous calculation.
 
