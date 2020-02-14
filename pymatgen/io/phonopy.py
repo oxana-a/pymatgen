@@ -2,6 +2,9 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
+"""
+Module for interfacing with phonopy, see https://atztogo.github.io/phonopy/
+"""
 
 import numpy as np
 from pymatgen.core import Structure, Lattice
@@ -9,6 +12,7 @@ from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine
 from pymatgen.phonon.dos import PhononDos, CompletePhononDos
 from monty.serialization import loadfn
 from monty.dev import requires
+
 try:
     from phonopy import Phonopy
     from phonopy.structure.atoms import PhonopyAtoms
@@ -84,15 +88,15 @@ def get_structure_from_dict(d):
 
 
 def eigvec_to_eigdispl(v, q, frac_coords, mass):
-    """
+    r"""
     Converts a single eigenvector to an eigendisplacement in the primitive cell
     according to the formula::
-        
+
         exp(2*pi*i*(frac_coords \\dot q) / sqrt(mass) * v
-    
+
     Compared to the modulation option in phonopy, here all the additional
     multiplicative and phase factors are set to 1.
-    
+
     Args:
         v: the vector that should be converted. A 3D complex numpy array.
         q: the q point in fractional coordinates
@@ -102,19 +106,19 @@ def eigvec_to_eigdispl(v, q, frac_coords, mass):
 
     c = np.exp(2j * np.pi * np.dot(frac_coords, q)) / np.sqrt(mass)
 
-    return c*v
+    return c * v
 
 
 def get_ph_bs_symm_line_from_dict(bands_dict, has_nac=False, labels_dict=None):
-    """
+    r"""
     Creates a pymatgen PhononBandStructure object from the dictionary
     extracted by the band.yaml file produced by phonopy. The labels
     will be extracted from the dictionary, if present. If the 'eigenvector'
-    key is found the eigendisplacements will be calculated according to the 
+    key is found the eigendisplacements will be calculated according to the
     formula::
-        
+
         exp(2*pi*i*(frac_coords \\dot q) / sqrt(mass) * v
-    
+
     and added to the object.
 
     Args:
@@ -143,7 +147,7 @@ def get_ph_bs_symm_line_from_dict(bands_dict, has_nac=False, labels_dict=None):
                 for i, eig_a in enumerate(b['eigenvector']):
                     v = np.zeros(3, np.complex)
                     for x in range(3):
-                        v[x] = eig_a[x][0] + eig_a[x][1]*1j
+                        v[x] = eig_a[x][0] + eig_a[x][1] * 1j
                     eig_b.append(eigvec_to_eigdispl(
                         v, q, structure[i].frac_coords,
                         structure.site_properties['phonopy_masses'][i]))
@@ -172,7 +176,7 @@ def get_ph_bs_symm_line_from_dict(bands_dict, has_nac=False, labels_dict=None):
 
 
 def get_ph_bs_symm_line(bands_path, has_nac=False, labels_dict=None):
-    """
+    r"""
     Creates a pymatgen PhononBandStructure from a band.yaml file.
     The labels will be extracted from the dictionary, if present.
     If the 'eigenvector'  key is found the eigendisplacements will be
@@ -229,7 +233,7 @@ def get_complete_ph_dos(partial_dos_path, phonopy_yaml_path):
 @requires(Phonopy, "phonopy not installed!")
 def get_displaced_structures(pmg_structure, atom_disp=0.01,
                              supercell_matrix=None, yaml_fname=None, **kwargs):
-    """
+    r"""
     Generate a set of symmetrically inequivalent displaced structures for
     phonon calculations.
 
@@ -263,10 +267,9 @@ def get_displaced_structures(pmg_structure, atom_disp=0.01,
 
     if yaml_fname is not None:
         displacements = phonon.get_displacements()
-        directions = phonon.get_displacement_directions()
         write_disp_yaml(displacements=displacements,
                         supercell=phonon.get_supercell(),
-                        directions=directions, filename=yaml_fname)
+                        filename=yaml_fname)
 
     # Supercell structures with displacement
     disp_supercells = phonon.get_supercells_with_displacements()
