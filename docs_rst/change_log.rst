@@ -1,6 +1,67 @@
 Change log
 ==========
 
+v2020.1.28
+----------
+* Plugin architecture for pymatgen.
+* Improvements to pymatgen.analysis.xas.spectrum.XAS class. (@yiming)
+* Fixes for ISYM uniform bug and auto-NEDSO (@fraricci) 
+* Improvements to ReactionDiagram.
+* Chemenv improvements (@davidwaroquiers)
+* Misc bug fixes.
+
+v2020.1.10
+----------
+* New connectivity analysis in Chemenv (@davidwaroquiers)
+* Improvements to DOSPlotter (@uthpalah)
+* Improvements to writing VASP input sets (@rkingsbury)
+* Bug fix for PhaseDiagram (@montoyjh)
+
+v2019.12.22
+-----------
+* Improvements to reaction calculator (@mattmcdermott)
+* VASP input set for SCAN from Materials Project, MPScanSet (@rkingsbury)
+* Bug fixes and documentation improvements (@LindaHung-TRI, @rkingsbury, @kwaters4, @rwoodsrobinson, @JaGeo, @nishiyamat, @smheidrich)
+
+v2019.12.3
+----------
+* Respect KSPACING in INCAR.
+* Bug fixes.
+
+v2019.11.11
+-----------
+* Extend grosspop class (@Jageo)
+* Add option to VaspInputSet to write output with POTCAR.spec
+* Add sort_structure option to Poscar.
+* Added ability to make gaussian input file without a geometry (@WardLT)
+* Misc big fixes.
+
+v2019.10.16
+-----------
+1. Major refactoring of ABINIT IO to remove workflow-based packages (@gmatteo)
+2. Use caching in MinimumVIRENN class. (Alex Ganose)
+3. Changes to Lobster module and lobsterset (@jageo)
+4. Eigenval object for EIGENVAL output file (@mturiansky)
+
+v2019.10.4
+----------
+1. Fix compile args.
+
+v2019.10.3
+----------
+* Faster get_all_neighbors based on @chc273's improvements. get_all_neighbors
+  now returns a Site-like object with nn_distance, image and index attrbutes.
+  Much easier to use.
+* Bug fix for XCrySDen parser (@stevetorr)
+* Added optional mid_struct to direct interpolation (@jmmshn)
+
+v2019.10.2
+----------
+* IRSpectra class (@henriquemiranda)
+* Much faster get_neighbors written in Cython (@chc273).
+* VolumetricData allows for sum or substraction of data with different
+  structures, with warnings.
+
 v2019.9.16
 ----------
 * Updates to annotation, docstrings, etc. Linting service now provided on Github

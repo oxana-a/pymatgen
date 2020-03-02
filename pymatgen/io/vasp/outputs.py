@@ -654,7 +654,7 @@ class Vasprun(MSONable):
         TODO: Fix for other functional types like PW91, other vdW types, etc.
         """
         GGA_TYPES = {"RE": "revPBE", "PE": "PBE", "PS": "PBESol", "RP": "RevPBE+PADE", "AM": "AM05", "OR": "optPBE",
-                     "BO": "optB88", "MK": "optB86b", "--": "None or LDA"}
+                     "BO": "optB88", "MK": "optB86b", "--": "GGA"}
 
         METAGGA_TYPES = {"TPSS": "TPSS", "RTPSS": "revTPSS", "M06L": "M06-L", "MBJ": "modified Becke-Johnson",
                          "SCAN": "SCAN", "MS0": "MadeSimple0", "MS1": "MadeSimple1", "MS2": "MadeSimple2"}
@@ -669,15 +669,13 @@ class Vasprun(MSONable):
             rt = "B3LYP"
         elif self.parameters.get("LHFCALC", True):
             rt = "PBEO or other Hybrid Functional"
-        elif self.parameters.get("BPARAM", 15.70) == 15.70 and self.parameters.get("LUSE_VDW", True):
+        elif self.parameters.get("LUSE_VDW", False):
             if self.incar.get("METAGGA", "").strip().upper() in METAGGA_TYPES:
-                rt = GGA_TYPES[self.parameters.get("GGA", "").strip().upper()] + "+" + \
-                     METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()] + "+rVV10"
+                rt = METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()] + "+rVV10"
             else:
                 rt = GGA_TYPES[self.parameters.get("GGA", "").strip().upper()] + "+rVV10"
         elif self.incar.get("METAGGA", "").strip().upper() in METAGGA_TYPES:
-            rt = GGA_TYPES[self.parameters.get("GGA", "").strip().upper()] + "+" + \
-                 METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()]
+            rt = METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()]
             if self.is_hubbard or self.parameters.get("LDAU", True):
                 rt += "+U"
         elif self.potcar_symbols[0].split()[0] == 'PAW':
@@ -1648,6 +1646,30 @@ class Outcar:
         self.final_energy = total_energy
         self.data = {}
 
+        # Read "total number of plane waves", NPLWV:
+        self.read_pattern(
+            {"nplwv": r"total plane-waves  NPLWV =\s+(\*{6}|\d+)"},
+            terminate_on_match=True
+        )
+        try:
+            self.data["nplwv"] = [[int(self.data["nplwv"][0][0])]]
+        except ValueError:
+            self.data["nplwv"] = [[None]]
+
+        nplwvs_at_kpoints = [
+            n for [n] in self.read_table_pattern(
+                r"\n{3}-{104}\n{3}",
+                r".+plane waves:\s+(\*{6,}|\d+)",
+                r"maximum and minimum number of plane-waves"
+            )
+        ]
+        self.data["nplwvs_at_kpoints"] = [None for n in nplwvs_at_kpoints]
+        for (n, nplwv) in enumerate(nplwvs_at_kpoints):
+            try:
+                self.data["nplwvs_at_kpoints"][n] = int(nplwv)
+            except ValueError:
+                pass
+
         # Read the drift:
         self.read_pattern({
             "drift": r"total drift:\s+([\.\-\d]+)\s+([\.\-\d]+)\s+([\.\-\d]+)"},
@@ -2102,7 +2124,7 @@ class Outcar:
         # therefore regex assumes f, but filter out None values if d
 
         header_pattern = r"spin component  1\n"
-        row_pattern = r'[^\S\r\n]*(?:([\d.-]+)[^\S\r\n]*)' + r'(?:([\d.-]+)[^\S\r\n]*)?' * 6 + r'.*?'
+        row_pattern = r'[^\S\r\n]*(?:([\d.-]+))' + r'(?:[^\S\r\n]*(-?[\d.]+)[^\S\r\n]*)?' * 6 + r'.*?'
         footer_pattern = r"\nspin component  2"
         spin1_component = self.read_table_pattern(header_pattern, row_pattern,
                                                   footer_pattern, postprocess=lambda x: float(x) if x else None,
@@ -2114,7 +2136,7 @@ class Outcar:
         # and repeat for Spin.down
 
         header_pattern = r"spin component  2\n"
-        row_pattern = r'[^\S\r\n]*(?:([\d.-]+)[^\S\r\n]*)' + r'(?:([\d.-]+)[^\S\r\n]*)?' * 6 + r'.*?'
+        row_pattern = r'[^\S\r\n]*(?:([\d.-]+))' + r'(?:[^\S\r\n]*(-?[\d.]+)[^\S\r\n]*)?' * 6 + r'.*?'
         footer_pattern = r"\n occupancies and eigenvectors"
         spin2_component = self.read_table_pattern(header_pattern, row_pattern,
                                                   footer_pattern, postprocess=lambda x: float(x) if x else None,
@@ -2922,6 +2944,17 @@ class VolumetricData(MSONable):
     def __sub__(self, other):
         return self.linear_add(other, -1.0)
 
+    def copy(self):
+        """
+        :return: Copy of Volumetric object
+        """
+        return VolumetricData(
+            self.structure,
+            {k: v.copy() for k, v in self.data.items()},
+            distance_matrix=self._distance_matrix,
+            data_aug=self.data_aug
+        )
+
     def linear_add(self, other, scale_factor=1.0):
         """
         Method to do a linear sum of volumetric objects. Used by + and -
@@ -2936,9 +2969,12 @@ class VolumetricData(MSONable):
             VolumetricData corresponding to self + scale_factor * other.
         """
         if self.structure != other.structure:
-            raise ValueError("Adding or subtraction operations can only be "
-                             "performed for volumetric data with the exact "
-                             "same structure.")
+            warnings.warn("Structures are different. Make sure you know what "
+                          "you are doing...")
+        if self.data.keys() != other.data.keys():
+            raise ValueError("Data have different keys! Maybe one is spin-"
+                             "polarized and the other is not?")
+
         # To add checks
         data = {}
         for k in self.data.keys():
@@ -3108,7 +3144,8 @@ class VolumetricData(MSONable):
                         lines = []
                     else:
                         lines.append(" ")
-                f.write(" " + "".join(lines) + " \n")
+                if count % 5 != 0:
+                    f.write(" " + "".join(lines) + " \n")
                 f.write("".join(self.data_aug.get(data_type, [])))
 
             write_spin("total")
@@ -3236,7 +3273,7 @@ class VolumetricData(MSONable):
             f.attrs["structure_json"] = json.dumps(self.structure.as_dict())
 
     @classmethod
-    def from_hdf5(cls, filename):
+    def from_hdf5(cls, filename, **kwargs):
         """
         Reads VolumetricData from HDF5 file.
 
@@ -3246,8 +3283,11 @@ class VolumetricData(MSONable):
         import h5py
         with h5py.File(filename, "r") as f:
             data = {k: np.array(v) for k, v in f["vdata"].items()}
+            data_aug = None
+            if 'vdata_aug' in f:
+                data_aug = {k: np.array(v) for k, v in f["vdata_aug"].items()}
             structure = Structure.from_dict(json.loads(f.attrs["structure_json"]))
-            return VolumetricData(structure, data)
+            return cls(structure, data=data, data_aug=data_aug, **kwargs)
 
 
 class Locpot(VolumetricData):
@@ -3264,8 +3304,8 @@ class Locpot(VolumetricData):
         super().__init__(poscar.structure, data)
         self.name = poscar.comment
 
-    @staticmethod
-    def from_file(filename):
+    @classmethod
+    def from_file(cls, filename, **kwargs):
         """
         Reads a LOCPOT file.
 
@@ -3273,7 +3313,7 @@ class Locpot(VolumetricData):
         :return: Locpot
         """
         (poscar, data, data_aug) = VolumetricData.parse_file(filename)
-        return Locpot(poscar, data)
+        return cls(poscar, data, **kwargs)
 
 
 class Chgcar(VolumetricData):
@@ -3286,10 +3326,19 @@ class Chgcar(VolumetricData):
         Args:
             poscar (Poscar): Poscar object containing structure.
             data: Actual data.
+            data_aug: Augmentation charge data
         """
-        super().__init__(poscar.structure, data, data_aug=data_aug)
-        self.poscar = poscar
-        self.name = poscar.comment
+        # allow for poscar or structure files to be passed
+        if isinstance(poscar, Poscar):
+            tmp_struct = poscar.structure
+            self.poscar = poscar
+            self.name = poscar.comment
+        elif isinstance(poscar, Structure):
+            tmp_struct = poscar
+            self.poscar = Poscar(poscar)
+            self.name = None
+
+        super().__init__(tmp_struct, data, data_aug=data_aug)
         self._distance_matrix = {}
 
     @staticmethod
@@ -3710,7 +3759,7 @@ def get_band_structure_from_vasp_multiple_branches(dir_name, efermi=None,
                 branches.append(run.get_band_structure(efermi=efermi))
             else:
                 # It might be better to throw an exception
-                warnings.warn("Skipping {}. Unable to find {}".format(d=dir_name, f=xml_file))
+                warnings.warn("Skipping {}. Unable to find {}".format(dir_name, xml_file))
 
         return get_reconstructed_band_structure(branches, efermi)
     else:
@@ -4483,6 +4532,126 @@ class Wavecar:
 
         self.ng = temp_ng
         return Chgcar(poscar, data)
+
+
+class Eigenval:
+    """
+    Object for reading EIGENVAL file.
+
+    .. attribute:: filename
+
+        string containing input filename
+
+    .. attribute:: occu_tol
+
+        tolerance for determining occupation in band properties
+
+    .. attribute:: ispin
+
+        spin polarization tag (int)
+
+    .. attribute:: nelect
+
+        number of electrons
+
+    .. attribute:: nkpt
+
+        number of kpoints
+
+    .. attribute:: nbands
+
+        number of bands
+
+    .. attribute:: kpoints
+
+        list of kpoints
+
+    .. attribute:: kpoints_weights
+
+        weights of each kpoint in the BZ, should sum to 1.
+
+    .. attribute:: eigenvalues
+
+        Eigenvalues as a dict of {(spin): np.ndarray(shape=(nkpt, nbands, 2))}.
+        This representation is based on actual ordering in VASP and is meant as
+        an intermediate representation to be converted into proper objects. The
+        kpoint index is 0-based (unlike the 1-based indexing in VASP).
+    """
+
+    def __init__(self, filename, occu_tol=1e-8):
+        """
+        Reads input from filename to construct Eigenval object
+
+        Args:
+            filename (str):     filename of EIGENVAL to read in
+            occu_tol (float):   tolerance for determining band gap
+
+        Returns:
+            a pymatgen.io.vasp.outputs.Eigenval object
+        """
+
+        self.filename = filename
+        self.occu_tol = occu_tol
+
+        with zopen(filename, 'r') as f:
+            self.ispin = int(f.readline().split()[-1])
+
+            # useless header information
+            for _ in range(4):
+                f.readline()
+
+            self.nelect, self.nkpt, self.nbands = \
+                list(map(int, f.readline().split()))
+
+            self.kpoints = []
+            self.kpoints_weights = []
+            if self.ispin == 2:
+                self.eigenvalues = \
+                    {Spin.up: np.zeros((self.nkpt, self.nbands, 2)),
+                     Spin.down: np.zeros((self.nkpt, self.nbands, 2))}
+            else:
+                self.eigenvalues = \
+                    {Spin.up: np.zeros((self.nkpt, self.nbands, 2))}
+
+            ikpt = -1
+            for line in f:
+                if re.search(r'(\s+[\-+0-9eE.]+){4}', str(line)):
+                    ikpt += 1
+                    kpt = list(map(float, line.split()))
+                    self.kpoints.append(kpt[:-1])
+                    self.kpoints_weights.append(kpt[-1])
+                    for i in range(self.nbands):
+                        sl = list(map(float, f.readline().split()))
+                        if len(sl) == 3:
+                            self.eigenvalues[Spin.up][ikpt, i, 0] = sl[1]
+                            self.eigenvalues[Spin.up][ikpt, i, 1] = sl[2]
+                        elif len(sl) == 5:
+                            self.eigenvalues[Spin.up][ikpt, i, 0] = sl[1]
+                            self.eigenvalues[Spin.up][ikpt, i, 1] = sl[3]
+                            self.eigenvalues[Spin.down][ikpt, i, 0] = sl[2]
+                            self.eigenvalues[Spin.down][ikpt, i, 1] = sl[4]
+
+    @property
+    def eigenvalue_band_properties(self):
+        """
+        Band properties from the eigenvalues as a tuple,
+        (band gap, cbm, vbm, is_band_gap_direct).
+        """
+
+        vbm = -float("inf")
+        vbm_kpoint = None
+        cbm = float("inf")
+        cbm_kpoint = None
+        for spin, d in self.eigenvalues.items():
+            for k, val in enumerate(d):
+                for (eigenval, occu) in val:
+                    if occu > self.occu_tol and eigenval > vbm:
+                        vbm = eigenval
+                        vbm_kpoint = k
+                    elif occu <= self.occu_tol and eigenval < cbm:
+                        cbm = eigenval
+                        cbm_kpoint = k
+        return max(cbm - vbm, 0), cbm, vbm, vbm_kpoint == cbm_kpoint
 
 
 class Wavederf:

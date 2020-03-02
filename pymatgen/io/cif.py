@@ -807,16 +807,18 @@ class CifParser:
                 id = list(map(int, (
                     data.data.get("_space_group_magn.number_BNS").split("."))))
 
-            msg = MagneticSpaceGroup(id)
-
             if data.data.get("_space_group_magn.transform_BNS_Pp_abc"):
                 if data.data.get(
                         "_space_group_magn.transform_BNS_Pp_abc") != "a,b,c;0,0,0":
-                    return NotImplementedError(
-                        "Non-standard settings not currently supported.")
+
+                    jf = data.data.get("_space_group_magn.transform_BNS_Pp_abc")
+                    msg = MagneticSpaceGroup(id, jf)
+
             elif data.data.get("_space_group_magn.transform_BNS_Pp"):
                 return NotImplementedError(
                     "Incomplete specification to implement.")
+            else:
+                msg = MagneticSpaceGroup(id)
 
             magsymmops = msg.symmetry_ops
 
@@ -1179,7 +1181,7 @@ class CifParser:
                 bibtex_entry.pop('page_last', None)
 
             # cite keys are given as cif-reference-idx in order they are found
-            entries['cif-reference-{}'.format(idx)] = Entry('article', list(bibtex_entry.items()))
+            entries['cifref{}'.format(idx)] = Entry('article', list(bibtex_entry.items()))
 
         return BibliographyData(entries).to_string(bib_format='bibtex')
 
