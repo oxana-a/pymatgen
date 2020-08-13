@@ -7,30 +7,32 @@ Wrapper classes for Cif input and output from Structures.
 """
 
 import math
-import re
 import os
+import re
 import textwrap
 import warnings
 from collections import OrderedDict, deque
-from io import StringIO
-import numpy as np
 from functools import partial
-from pathlib import Path
 from inspect import getfullargspec as getargspec
+from io import StringIO
 from itertools import groupby
-from pymatgen.core.periodic_table import Element, Specie, get_el_sp, DummySpecie
+from pathlib import Path
+
+import numpy as np
 from monty.io import zopen
-from pymatgen.util.coord import in_coord_list_pbc, find_in_coord_list_pbc
 from monty.string import remove_non_ascii
-from pymatgen.core.lattice import Lattice
-from pymatgen.core.structure import Structure
+
 from pymatgen.core.composition import Composition
-from pymatgen.core.operations import SymmOp
-from pymatgen.symmetry.groups import SpaceGroup, SYMM_DATA
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from pymatgen.electronic_structure.core import Magmom
+from pymatgen.core.lattice import Lattice
 from pymatgen.core.operations import MagSymmOp
+from pymatgen.core.operations import SymmOp
+from pymatgen.core.periodic_table import Element, Specie, get_el_sp, DummySpecie
+from pymatgen.core.structure import Structure
+from pymatgen.electronic_structure.core import Magmom
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.symmetry.groups import SpaceGroup, SYMM_DATA
 from pymatgen.symmetry.maggroups import MagneticSpaceGroup
+from pymatgen.util.coord import in_coord_list_pbc, find_in_coord_list_pbc
 
 __author__ = "Shyue Ping Ong, Will Richards, Matthew Horton"
 __copyright__ = "Copyright 2011, The Materials Project"
@@ -451,11 +453,9 @@ class CifParser:
                     # in "els_occu"
                     symbol_str = data["_atom_site_type_symbol"][idx]
                     symbol_str_lst = symbol_str.split(' + ')
-                    for elocc_idx in range(len(symbol_str_lst)):
+                    for elocc_idx, sym in enumerate(symbol_str_lst):
                         # Remove any bracketed items in the string
-                        symbol_str_lst[elocc_idx] = re.sub(
-                            r'\([0-9]*\)', '',
-                            symbol_str_lst[elocc_idx].strip())
+                        symbol_str_lst[elocc_idx] = re.sub(r'\([0-9]*\)', '', sym.strip())
 
                         # Extract element name and its occupancy from the
                         # string, and store it as a
@@ -608,15 +608,15 @@ class CifParser:
                         coords.append(coord)
                         magmoms.append(magmom)
             return coords, magmoms
-        else:
-            for tmp_coord in coords_in:
-                for op in self.symmetry_operations:
-                    coord = op.operate(tmp_coord)
-                    coord = np.array([i - math.floor(i) for i in coord])
-                    if not in_coord_list_pbc(coords, coord,
-                                             atol=self._site_tolerance):
-                        coords.append(coord)
-            return coords, [Magmom(0)] * len(coords)  # return dummy magmoms
+
+        for tmp_coord in coords_in:
+            for op in self.symmetry_operations:
+                coord = op.operate(tmp_coord)
+                coord = np.array([i - math.floor(i) for i in coord])
+                if not in_coord_list_pbc(coords, coord,
+                                         atol=self._site_tolerance):
+                    coords.append(coord)
+        return coords, [Magmom(0)] * len(coords)  # return dummy magmoms
 
     def get_lattice(self, data, length_strings=("a", "b", "c"),
                     angle_strings=("alpha", "beta", "gamma"),
@@ -635,8 +635,7 @@ class CifParser:
             if not lattice_type:
                 return Lattice.from_parameters(*lengths, *angles)
 
-            else:
-                return getattr(Lattice, lattice_type)(*(lengths + angles))
+            return getattr(Lattice, lattice_type)(*(lengths + angles))
 
         except KeyError:
             # Missing Key search for cell setting
@@ -830,7 +829,8 @@ class CifParser:
 
         return magsymmops
 
-    def parse_oxi_states(self, data):
+    @staticmethod
+    def parse_oxi_states(data):
         """
         Parse oxidation states from data dictionary
         """
@@ -849,7 +849,8 @@ class CifParser:
             oxi_states = None
         return oxi_states
 
-    def parse_magmoms(self, data, lattice=None):
+    @staticmethod
+    def parse_magmoms(data, lattice=None):
         """
         Parse atomic magnetic moments from data dictionary
         """
@@ -924,7 +925,7 @@ class CifParser:
         if self.feature_flags["magcif_incommensurate"]:
             raise NotImplementedError(
                 "Incommensurate structures not currently supported.")
-        elif self.feature_flags["magcif"]:
+        if self.feature_flags["magcif"]:
             self.symmetry_operations = self.get_magsymops(data)
             magmoms = self.parse_magmoms(data, lattice=lattice)
         else:
@@ -1007,8 +1008,9 @@ class CifParser:
         sum_occu = [sum(c.values()) for c in coord_to_species.values()
                     if not set(c.elements) == {Element("O"), Element("H")}]
         if any([o > 1 for o in sum_occu]):
-            msg = "Some occupancies (%s) sum to > 1! If they are within " \
-                  "the tolerance, they will be rescaled." % str(sum_occu)
+            msg = "Some occupancies ({}) sum to > 1! If they are within " \
+                  "the occupancy_tolerance, they will be rescaled. " \
+                  "The current occupancy_tolerance is set to: {}".format(sum_occu, self._occupancy_tolerance)
             warnings.warn(msg)
             self.warnings.append(msg)
 
@@ -1103,7 +1105,7 @@ class CifParser:
             List of Structures.
         """
         structures = []
-        for d in self._cif.data.values():
+        for i, d in enumerate(self._cif.data.values()):
             try:
                 s = self._get_structure(d, primitive)
                 if s:
@@ -1113,7 +1115,10 @@ class CifParser:
                 # A user reported a problem with cif files produced by Avogadro
                 # in which the atomic coordinates are in Cartesian coords.
                 self.warnings.append(str(exc))
-                warnings.warn(str(exc))
+                warnings.warn("No structure parsed for %d structure in CIF. Section of CIF file below." % (i + 1))
+                warnings.warn(str(d))
+                warnings.warn("Error is %s." % str(exc))
+
         if self.warnings:
             warnings.warn("Issues encountered while parsing CIF: %s" % "\n".join(self.warnings))
         if len(structures) == 0:
