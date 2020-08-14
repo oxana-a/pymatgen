@@ -880,8 +880,6 @@ class MPHSERelaxSet(DictSet):
         self.kwargs = kwargs
 
 
-
-
 class MPStaticSet(MPRelaxSet):
     """
     Creates input files for a static calculation.
@@ -1021,7 +1019,6 @@ class MPStaticSet(MPRelaxSet):
                     kpoints = Kpoints.gamma_automatic(kpoints.kpts[0])
         return kpoints
 
-
     def override_from_prev_calc(self, prev_calc_dir='.', **kwargs):
         """
         Update the input set to include settings from a previous calculation.
@@ -1075,6 +1072,7 @@ class MPStaticSet(MPRelaxSet):
         input_set = cls(_dummy_structure, **kwargs)
         return input_set.override_from_prev_calc(prev_calc_dir=prev_calc_dir, **kwargs)
 
+
 class LinearResponseUSet(MPRelaxSet):
     def __init__(self, structure, prev_incar=None, prev_kpoints=None,
                  lepsilon=False, lcalcpol=False, reciprocal_density=100,
@@ -1103,12 +1101,12 @@ class LinearResponseUSet(MPRelaxSet):
         settings.pop("LDAUL")
 
         structure = self.structure
-        comp = structure.composition
-        elements = sorted([el for el in comp.elements if comp[el] > 0],
-                          key=lambda e: e.X)
-        most_electroneg = elements[-1].symbol
-        poscar = Poscar(structure)
-        hubbard_u = settings.get("LDAU", False)
+        # comp = structure.composition
+        # elements = sorted([el for el in comp.elements if comp[el] > 0],
+        #                   key=lambda e: e.X)
+        # most_electroneg = elements[-1].symbol
+        # poscar = Poscar(structure)
+        # hubbard_u = settings.get("LDAU", False)
 
         incar = Incar(self.prev_incar) if self.prev_incar is not None else \
             Incar(parent_incar)
@@ -1191,6 +1189,7 @@ class LinearResponseUSet(MPRelaxSet):
             incar["LORBIT"] = self.kwargs.get("user_incar_settings")["LORBIT"]
 
         return incar
+
     @property
     def kpoints(self):
         self._config_dict["KPOINTS"]["reciprocal_density"] = \
@@ -1257,7 +1256,6 @@ class LinearResponseUSet(MPRelaxSet):
         """
         input_set = cls(_dummy_structure, **kwargs)
         return input_set.override_from_prev_calc(prev_calc_dir=prev_calc_dir)
-
 
 
 class MPScanStaticSet(MPScanRelaxSet):
@@ -3235,55 +3233,3 @@ def batch_write_input(
 _dummy_structure = Structure([1, 0, 0, 0, 1, 0, 0, 0, 1], ['I'], [[0, 0, 0]],
                              site_properties={"magmom": [[0, 0, 1]]})
 
-class MPSurfaceSet(MVLSlabSet):
-    """
-    Input class for MP slab calcs, mostly to change parameters
-    and defaults slightly
-    """
-    def __init__(self, structure, bulk=False, auto_dipole=None, **kwargs):
-
-        # If not a bulk calc, turn get_locpot/auto_dipole on by default
-        auto_dipole = auto_dipole or not bulk
-        super(MPSurfaceSet, self).__init__(
-            structure, bulk=bulk, auto_dipole=False, **kwargs)
-        # This is a hack, but should be fixed when this is ported over to
-        # pymatgen to account for vasp native dipole fix
-        if auto_dipole:
-            self._config_dict['INCAR'].update({"LDIPOL": True, "IDIPOL": 3})
-            self.auto_dipole = True
-
-    @property
-    def incar(self):
-        incar = super(MPSurfaceSet, self).incar
-
-        # Determine LDAU based on slab chemistry without adsorbates
-        ldau_elts = {'O', 'F'}
-        if self.structure.site_properties.get("surface_properties"):
-            non_adsorbate_elts = {
-                s.specie.symbol for s in self.structure
-                if not s.properties['surface_properties'] == 'adsorbate'}
-        else:
-            non_adsorbate_elts = {s.specie.symbol for s in self.structure}
-        ldau = bool(non_adsorbate_elts & ldau_elts)
-
-        # Should give better forces for optimization
-        incar_config = {"EDIFFG": -0.05, "ENAUG": 4000, "IBRION": 2,
-                        "POTIM": 1.0, "LDAU": ldau, "EDIFF": 1e-5, "ISYM": 0}
-        incar.update(incar_config)
-        incar.update(self.user_incar_settings)
-        return incar
-        v.write_input(
-            str(d),
-            make_dir_if_not_present=make_dir_if_not_present,
-            include_cif=include_cif,
-            potcar_spec=potcar_spec,
-            zip_output=zip_output,
-        )
-
-
-_dummy_structure = Structure(
-    [1, 0, 0, 0, 1, 0, 0, 0, 1],
-    ["I"],
-    [[0, 0, 0]],
-    site_properties={"magmom": [[0, 0, 1]]},
-)

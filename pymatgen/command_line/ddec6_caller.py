@@ -1,3 +1,5 @@
+# coding: utf-8
+
 __author__ = "mhsiron"
 __version__ = "0.1"
 __maintainer__ = "Martin Siron"
@@ -8,8 +10,6 @@ __date__ = "11/02/19"
 import os
 import subprocess
 import shutil
-import warnings
-import glob
 import numpy as np
 from pymatgen.core import Element
 
@@ -23,18 +23,18 @@ DDEC6EXE = which("Chargemol") or which("Chargemol.exe")
 
 
 class DDEC6Analysis:
-    '''
+    """
     DDEC6 Analysis
-    '''
+    """
     @requires(which("Chargemol") or which("Chargemol.exe"),
               "DDEC6Analysis requires the executable Chargemol to be in the "
               "system path. Please download the library at "
               "http://sourceforge.com/ddec6")
     def __init__(self, chgcar_filename="CHGCAR.gz",
                  potcar_filename="POTCAR.gz",
-                 aeccar_filenames=["AECCAR0.gz", "AECCAR1.gz", "AECCAR2.gz"],
-                 run=True, ad_dir=None, custom_command=None, gzipped=True):
-        '''
+                 aeccar_filenames=None, run=True, ad_dir=None,
+                 custom_command=None, gzipped=True):
+        """
         Initializes the DDEC6 Analysis. Either runs DDEC6 executable,
          or simply analyzes the files created by DDEC6
         :param chgcar_filename: (str) path to CHGCAR file
@@ -48,7 +48,10 @@ class DDEC6Analysis:
             executable
         :param gzipped: whether or not the files are gzipped,
             they will be unzipped if so
-        '''
+        """
+        if aeccar_filenames is None:
+            aeccar_filenames = ["AECCAR0.gz", "AECCAR1.gz", "AECCAR2.gz"]
+
         # Set properties
         self.species_count = 0
         self.atomic_charges = []
@@ -73,7 +76,7 @@ class DDEC6Analysis:
             self._from_data_dir()
 
     def _execute_ddec6(self, ad_dir, custom_command, gzipped):
-        '''
+        """
         Internal command to execute DDEC6, data analysis runs after
         :param ad_dir: custom directory for atomic_densities. Otherwise
             gets value from "DDEC6_ATOMIC_DENSITIES_DIR" environment variable
@@ -81,7 +84,7 @@ class DDEC6Analysis:
             executable
         :param gzipped: whether or not the files are gzipped,
             they will be unzipped if so
-        '''
+        """
 
         # Unzip if needed:
         if gzipped:
@@ -108,7 +111,7 @@ class DDEC6Analysis:
         rs = subprocess.Popen(args,
                               stdout=subprocess.PIPE,
                               stdin=subprocess.PIPE, close_fds=True)
-        stdout, stderr = rs.communicate()
+        # stdout, stderr = rs.communicate()
         if rs.returncode != 0:
             raise RuntimeError("DDEC6 exited with return code %d. "
                                "Please check your DDEC6 installation."
@@ -117,22 +120,22 @@ class DDEC6Analysis:
         self._from_data_dir()
 
     def _from_data_dir(self):
-        '''
+        """
         Internal command to load XYZ files and process post DDEC6 executable
-        '''
+        """
         # load files created
         # Atomic Charges
-        atomic_charges_lines = []
+        # atomic_charges_lines = []
         with open("DDEC6_even_tempered_net_atomic_charges.xyz",
                   "r") as f:
             atomic_charges_lines = [line.strip() for line in f]
         # Atomic Charges
-        bond_orders_lines = []
+        # bond_orders_lines = []
         with open("DDEC6_even_tempered_bond_orders.xyz",
                   "r") as f:
             bond_orders_lines = [line.strip() for line in f]
         # Overlap Populations
-        overlap_populations_lines = []
+        # overlap_populations_lines = []
         with open("overlap_populations.xyz",
                   "r") as f:
             overlap_populations_lines = [line.strip() for line in f]
@@ -146,14 +149,13 @@ class DDEC6Analysis:
         self._get_charge_info()
         self._get_bond_order_info()
 
-
     def get_charge_transfer(self, index=None, element=None, ):
-        '''
+        """
         Get charge for a select index or average of charge for a Element
         :param index: (int) specie index
         :param element: (Element) Pymatgen element
         :return: atomic charge, or avg of atomic charge for an element
-        '''
+        """
 
         if index is not None:
             print(index)
@@ -169,12 +171,12 @@ class DDEC6Analysis:
             return self.atomic_charges
 
     def get_charge(self, atom_index):
-        '''
+        """
            #     Calculates difference between the valence charge of an atomic specie
            #     and its DDEC6 calculated charge
            #     :param index: (int) specie index
            #     :return: charge transfer
-        '''
+        """
         potcar_indices = []
         for i, v in enumerate(self.chgcar.poscar.natoms):
             potcar_indices += [i] * v
@@ -183,12 +185,12 @@ class DDEC6Analysis:
         return nelect+self.get_charge_transfer(index=atom_index)
 
     def get_bond_order(self, index_from, index_to):
-        '''
+        """
         Returns bond order index of species connected to certain specie
         :param index_from: (int) specie originating
         :param index_to: (int) bonded to this specie
         :return: bond order index
-        '''
+        """
         if not self.bond_orders[index_from].get("all_bonds", False):
             print(
                 "DDEC6 did not find specie {} to be connected to any specie".format(
@@ -205,19 +207,20 @@ class DDEC6Analysis:
                 index_to, {}).get("bond_order", None)
 
     def _get_info_from_xyz(self, raw_data_key, info_array):
-        '''
+        """
         Internal command to process XYZ files
         :param raw_data_key: key in raw_data collection
         :param info_array: key to analyze in XYZ header
         :return:
-        '''
+        """
         species_count = self.species_count
 
-        all_info = {}
-
         # in all files
-        all_info["coords"] = np.zeros([species_count, 3], dtype="float64")
-        all_info["species"] = []
+        all_info = {"coords": np.zeros([species_count, 3], dtype="float64"),
+                    "species": []}
+
+        # all_info["coords"] = np.zeros([species_count, 3], dtype="float64")
+        # all_info["species"] = []
 
         for element in info_array:
             all_info[element] = np.zeros(species_count, dtype="float64")
@@ -232,23 +235,25 @@ class DDEC6Analysis:
         return all_info
 
     def _write_jobscript_for_ddec6(self, ad_dir=None, net_charge=0.0,
-                                   periodicity=[True, True, True]):
-        '''
+                                   periodicity=None):
+        """
         Writes job_script.txt for DDEC6 execution
         :param ad_dir: (str) atomic densities reference directory
         :param net_charge: (float) net charge of structure, 0.0 is default
         :param periodicity: (list of booleans) periodicity among a,b, and c
-        '''
+        """
+        if periodicity is None:
+            periodicity = [True, True, True]
         self.net_charge = net_charge
         self.periodicity = periodicity
 
-        lines = []
-
         # Net Charge
-        lines.append("<net charge>")
-        lines.append(net_charge)
-        lines.append("</net charge>")
-        lines.append("")
+        lines = ["<net charge>", net_charge, "</net charge>", ""]
+
+        # lines.append("<net charge>")
+        # lines.append(net_charge)
+        # lines.append("</net charge>")
+        # lines.append("")
 
         # Periodicity
         per_a = ".true." if periodicity[0] else ".false."
@@ -276,9 +281,9 @@ class DDEC6Analysis:
                 fh.write('%s\n' % line)
 
     def _get_charge_info(self):
-        '''
+        """
         Internal command to process atomic charges, species, and coordinates
-        '''
+        """
         self.species_count = int(self.raw_data["atomic_charges"][0])
         self.atomic_charges = []
         self.species = []
@@ -289,11 +294,11 @@ class DDEC6Analysis:
             self.coords.append(line.split()[1:-2])
 
     def _get_bond_order_info(self):
-        '''
+        """
         Internal command to process bond order information
-        '''
+        """
         # Get meta data
-        bo_xyz = self._get_info_from_xyz("bond_orders", ["bond_orders"])
+        # bo_xyz = self._get_info_from_xyz("bond_orders", ["bond_orders"])
 
         # Get where relevant info for each atom starts
         bond_order_info = {}
@@ -323,12 +328,10 @@ class DDEC6Analysis:
                         int(bo_line.split()[5][:-1]),
                         int(bo_line.split()[6][:-1]))
 
-                    c_bo_by_bond = {c_bonded_to:
-                        {
-                            "element": c_bonded_to_element,
-                            "bond_order": c_bonded_to_bo,
-                            "direction": c_direction
-                        }
+                    c_bo_by_bond = {c_bonded_to: {
+                        "element": c_bonded_to_element,
+                        "bond_order": c_bonded_to_bo,
+                        "direction": c_direction}
                     }
                     bo_by_bond = c_bo_by_bond
                     if bond_order_info[atom].get("all_bonds"):
@@ -357,12 +360,10 @@ class DDEC6Analysis:
                         int(bo_line.split()[5][:-1]),
                         int(bo_line.split()[6][:-1]))
 
-                    c_bo_by_bond = {c_bonded_to:
-                        {
-                            "element": c_bonded_to_element,
-                            "bond_order": c_bonded_to_bo,
-                            "direction": c_direction
-                        }
+                    c_bo_by_bond = {c_bonded_to: {
+                        "element": c_bonded_to_element,
+                        "bond_order": c_bonded_to_bo,
+                        "direction": c_direction}
                     }
                     bo_by_bond = c_bo_by_bond
                     if bond_order_info[atom].get("all_bonds"):
@@ -377,11 +378,11 @@ class DDEC6Analysis:
         self.bond_orders = bond_order_info
 
     def update_structure(self):
-        '''
+        """
         Takes CHGCAR's structure object and updates it with atomic charges,
         and bond orders
         :return: updated structure
-        '''
+        """
         structure = self.chgcar.structure
         structure.add_site_property("atomic_charges_ddec6",
                                     self.atomic_charges)
