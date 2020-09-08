@@ -1,11 +1,13 @@
 Change log
 ==========
 
-v2020.1.28
+v2020.8.13
 ----------
-* Plugin architecture for pymatgen.
-* Improvements to pymatgen.analysis.xas.spectrum.XAS class. (@yiming)
-* Fixes for ISYM uniform bug and auto-NEDSO (@fraricci) 
-* Improvements to ReactionDiagram.
-* Chemenv improvements (@davidwaroquiers)
-* Misc bug fixes.
+* New GibbsComputedStructureEntry (@mattmcdermott, #1921)
+* Changes to MPScanRelaxSet and new MPScanStaticSet (@rkingsbury, #1917)
+* Changes to LobsterSet (@JaGeo, #1928)
+* Bug fix and change for MPRelaxSet (@mkhorton, 9eb3ac2)
+* Bug fix for JMolNN (@utf, #1920)
+* Bug fix for Element valences (@rkurchin, #1926)
+* Bug fix for BabelMolAdaptor (@smheidrich, #1924)
+* Bug fix for Gaussion IO (@eimrek, #1918)

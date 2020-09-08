@@ -7,41 +7,38 @@ Classes for reading/manipulating/writing VASP input files. All major VASP input
 files.
 """
 
-import os
-import re
+import glob
 import itertools
-import warnings
+import json
 import logging
 import math
-import json
-import glob
+import os
+import re
 import subprocess
-
-import numpy as np
-
-from numpy.linalg import det
+import warnings
 from collections import OrderedDict, namedtuple
+from enum import Enum
 from hashlib import md5
 
-from monty.io import zopen
-from monty.os.path import zpath
-from monty.json import MontyDecoder
-from monty.os import cd
-
-from enum import Enum
+import numpy as np
+import scipy.constants as const
 from tabulate import tabulate
 
-import scipy.constants as const
+from monty.io import zopen
+from monty.json import MSONable
+from monty.json import MontyDecoder
+from monty.os import cd
+from monty.os.path import zpath
+from monty.serialization import loadfn
 
 from pymatgen import SETTINGS, __version__
 from pymatgen.core.lattice import Lattice
-from pymatgen.core.structure import Structure
 from pymatgen.core.periodic_table import Element, get_el_sp
+from pymatgen.core.structure import Structure
 from pymatgen.electronic_structure.core import Magmom
-from pymatgen.util.string import str_delimited
 from pymatgen.util.io_utils import clean_lines
+from pymatgen.util.string import str_delimited
 from pymatgen.util.typing import PathLike
-from monty.json import MSONable
 
 __author__ = "Shyue Ping Ong, Geoffroy Hautier, Rickard Armiento, Vincent L Chevrier, Stephen Dacek"
 __copyright__ = "Copyright 2011, The Materials Project"
@@ -192,7 +189,6 @@ class Poscar(MSONable):
     def sites(self):
         sites_array = [site for site in self.structure]
         return sites_array
-    
 
     @property
     def natoms(self):
@@ -313,7 +309,7 @@ class Poscar(MSONable):
         if scale < 0:
             # In vasp, a negative scale factor is treated as a volume. We need
             # to translate this to a proper lattice vector scaling.
-            vol = abs(det(lattice))
+            vol = abs(np.linalg.det(lattice))
             lattice *= (-scale / vol) ** (1 / 3)
         else:
             lattice *= scale
@@ -359,8 +355,8 @@ class Poscar(MSONable):
             ):
                 natoms.extend([int(i) for i in lines[iline_natoms].split()])
             atomic_symbols = list()
-            for i in range(len(natoms)):
-                atomic_symbols.extend([symbols[i]] * natoms[i])
+            for i, nat in enumerate(natoms):
+                atomic_symbols.extend([symbols[i]] * nat)
             ipos = 5 + 2 * nlines_symbols
 
         postype = lines[ipos].split()[0]
@@ -381,8 +377,8 @@ class Poscar(MSONable):
         if default_names:
             try:
                 atomic_symbols = []
-                for i in range(len(natoms)):
-                    atomic_symbols.extend([default_names[i]] * natoms[i])
+                for i, nat in enumerate(natoms):
+                    atomic_symbols.extend([default_names[i]] * nat)
                 vasp5_symbols = True
             except IndexError:
                 pass
@@ -401,9 +397,9 @@ class Poscar(MSONable):
             except (ValueError, IndexError):
                 # Defaulting to false names.
                 atomic_symbols = []
-                for i in range(len(natoms)):
+                for i, nat in enumerate(natoms):
                     sym = Element.from_Z(i + 1).symbol
-                    atomic_symbols.extend([sym] * natoms[i])
+                    atomic_symbols.extend([sym] * nat)
                 warnings.warn(
                     "Elements in POSCAR cannot be determined. "
                     "Defaulting to false names %s." % " ".join(atomic_symbols)
@@ -739,9 +735,7 @@ class Incar(dict, MSONable):
             if k == "MAGMOM" and isinstance(self[k], list):
                 value = []
 
-                if (
-                    isinstance(self[k][0], list) or isinstance(self[k][0], Magmom)
-                ) and (self.get("LSORBIT") or self.get("LNONCOLLINEAR")):
+                if isinstance(self[k][0], (list, Magmom)) and (self.get("LSORBIT") or self.get("LNONCOLLINEAR")):
                     value.append(" ".join(str(i) for j in self[k] for i in j))
                 elif self.get("LSORBIT") or self.get("LNONCOLLINEAR"):
                     for m, g in itertools.groupby(self[k]):
@@ -760,8 +754,7 @@ class Incar(dict, MSONable):
 
         if pretty:
             return str(tabulate([[l[0], "=", l[1]] for l in lines], tablefmt="plain"))
-        else:
-            return str_delimited(lines, None, " = ") + "\n"
+        return str_delimited(lines, None, " = ") + "\n"
 
     def __str__(self):
         return self.get_string(sort_keys=True, pretty=False)
@@ -882,8 +875,7 @@ class Incar(dict, MSONable):
         def smart_int_or_float(numstr):
             if numstr.find(".") != -1 or numstr.lower().find("e") != -1:
                 return float(numstr)
-            else:
-                return int(numstr)
+            return int(numstr)
 
         try:
             if key in list_keys:
@@ -904,10 +896,8 @@ class Incar(dict, MSONable):
             if key in bool_keys:
                 m = re.match(r"^\.?([T|F|t|f])[A-Za-z]*\.?", val)
                 if m:
-                    if m.group(1) == "T" or m.group(1) == "t":
-                        return True
-                    else:
-                        return False
+                    return m.group(1).lower() == "t"
+
                 raise ValueError(key + " should be a boolean type!")
 
             if key in float_keys:
@@ -976,12 +966,11 @@ class Incar(dict, MSONable):
         Add all the values of another INCAR object to this object.
         Facilitates the use of "standard" INCARs.
         """
-        params = {k: v for k, v in self.items()}
+        params = dict(self.items())
         for k, v in other.items():
             if k in self and v != self[k]:
                 raise ValueError("Incars have conflicting values!")
-            else:
-                params[k] = v
+            params[k] = v
         return Incar(params)
 
     def check_params(self):
@@ -1043,7 +1032,7 @@ class Kpoints_supported_modes(Enum):
     Reciprocal = 5
 
     def __str__(self):
-        return self.name
+        return str(self.name)
 
     @staticmethod
     def from_string(s: str) -> "Kpoints_supported_modes":
@@ -1258,7 +1247,7 @@ class Kpoints(MSONable):
         Returns:
             Kpoints
         """
-        comment = "pymatgen v%s with grid density = %.0f / atom" % (__version__, kppa)
+        comment = "pymatgen v%s with grid density = %.0f / number of atoms" % (__version__, kppa)
         if math.fabs((math.floor(kppa ** (1 / 3) + 0.5)) ** 3 - kppa) < 1:
             kppa += kppa * 0.01
         latt = structure.lattice
@@ -1311,10 +1300,8 @@ class Kpoints(MSONable):
 
         style = Kpoints.supported_modes.Gamma
 
-        comment = (
-            "pymatgen 4.7.6+ generated KPOINTS with grid density = "
-            + "{} / atom".format(kppa)
-        )
+        comment = "pymatgen v%s with grid density = %.0f / number of atoms" % (__version__, kppa)
+
         num_kpts = 0
         return Kpoints(comment, num_kpts, style, [num_div], [0, 0, 0])
 
@@ -1418,7 +1405,7 @@ class Kpoints(MSONable):
         )
 
         # Automatic gamma and Monk KPOINTS, with optional shift
-        if style == "g" or style == "m":
+        if style in ["g", "m"]:
             kpts = [int(i) for i in lines[3].split()]
             kpts_shift = (0, 0, 0)
             if len(lines) > 4 and coord_pattern.match(lines[4]):
@@ -1627,10 +1614,7 @@ def _parse_string(s):
 def _parse_bool(s):
     m = re.match(r"^\.?([TFtf])[A-Za-z]*\.?", s)
     if m:
-        if m.group(1) == "T" or m.group(1) == "t":
-            return True
-        else:
-            return False
+        return m.group(1) in ["T", "t"]
     raise ValueError(s + " should be a boolean type!")
 
 
@@ -1650,6 +1634,14 @@ Orbital = namedtuple("Orbital", ["n", "l", "j", "E", "occ"])
 OrbitalDescription = namedtuple(
     "OrbitalDescription", ["l", "E", "Type", "Rcut", "Type2", "Rcut2"]
 )
+
+
+class UnknownPotcarWarning(UserWarning):
+    """
+    Warning raised when POTCAR hashes do not pass validation
+    """
+
+    pass
 
 
 class PotcarSingle:
@@ -1829,7 +1821,6 @@ class PotcarSingle:
 
         PSCTR.update(self.keywords)
         self.PSCTR = OrderedDict(sorted(PSCTR.items(), key=lambda x: x[0]))
-        self.hash = self.get_potcar_hash()
 
         if symbol:
             self._symbol = symbol
@@ -1838,6 +1829,23 @@ class PotcarSingle:
                 self._symbol = self.keywords["TITEL"].split(" ")[1].strip()
             except IndexError:
                 self._symbol = self.keywords["TITEL"].strip()
+
+        # Compute the POTCAR hashes and check them against the database of known
+        # VASP POTCARs
+        self.hash = self.get_potcar_hash()
+        self.file_hash = self.get_potcar_file_hash()
+
+        if self.identify_potcar(mode='data')[0] == []:
+            warnings.warn("POTCAR data with symbol {} does not match any VASP\
+                          POTCAR known to pymatgen. We advise verifying the\
+                          integrity of your POTCAR files.".format(self.symbol),
+                          UnknownPotcarWarning)
+        elif self.identify_potcar(mode='file')[0] == []:
+            warnings.warn("POTCAR with symbol {} has metadata that does not match\
+                          any VASP POTCAR known to pymatgen. The data in this\
+                          POTCAR is known to match the following functionals:\
+                          {}".format(self.symbol, self.identify_potcar(mode='data')[0]),
+                          UnknownPotcarWarning)
 
     def __str__(self):
         return self.data + "\n"
@@ -1977,10 +1985,9 @@ class PotcarSingle:
         """
         if self.lultra:
             return "US"
-        elif self.lpaw:
+        if self.lpaw:
             return "PAW"
-        else:
-            return "NC"
+        return "NC"
 
     @property
     def functional(self):
@@ -1996,9 +2003,126 @@ class PotcarSingle:
         """
         return self.functional_tags.get(self.LEXCH.lower(), {}).get("class")
 
+    def identify_potcar(self, mode: str = 'data'):
+        """
+        Identify the symbol and compatible functionals associated with this PotcarSingle.
+
+        This method checks the md5 hash of either the POTCAR data (PotcarSingle.hash)
+        or the entire POTCAR file (PotcarSingle.file_hash) against a database
+        of hashes for POTCARs distributed with VASP 5.4.4.
+
+        Args:
+            mode (str): 'data' or 'file'. 'data' mode checks the hash of the POTCAR
+                        data itself, while 'file' mode checks the hash of the entire
+                        POTCAR file, including metadata.
+
+        Returns:
+            symbol (List): List of symbols associated with the PotcarSingle
+            potcar_functionals (List): List of potcar functionals associated with
+                                       the PotcarSingle
+        """
+        # Dict to translate the sets in the .json file to the keys used in
+        # DictSet
+        mapping_dict = {'potUSPP_GGA': {"pymatgen_key": "PW91_US",
+                                        "vasp_description": "Ultrasoft pseudo potentials\
+                                         for LDA and PW91 (dated 2002-08-20 and 2002-04-08,\
+                                         respectively). These files are outdated, not\
+                                         supported and only distributed as is."},
+                        'potUSPP_LDA': {"pymatgen_key": "LDA_US",
+                                        "vasp_description": "Ultrasoft pseudo potentials\
+                                         for LDA and PW91 (dated 2002-08-20 and 2002-04-08,\
+                                         respectively). These files are outdated, not\
+                                         supported and only distributed as is."},
+                        'potpaw_GGA': {"pymatgen_key": "PW91",
+                                       "vasp_description": "The LDA, PW91 and PBE PAW datasets\
+                                        (snapshot: 05-05-2010, 19-09-2006 and 06-05-2010,\
+                                        respectively). These files are outdated, not\
+                                        supported and only distributed as is."},
+                        'potpaw_LDA': {"pymatgen_key": "Perdew-Zunger81",
+                                       "vasp_description": "The LDA, PW91 and PBE PAW datasets\
+                                        (snapshot: 05-05-2010, 19-09-2006 and 06-05-2010,\
+                                        respectively). These files are outdated, not\
+                                        supported and only distributed as is."},
+                        'potpaw_LDA.52': {"pymatgen_key": "LDA_52",
+                                          "vasp_description": "LDA PAW datasets version 52,\
+                                           including the early GW variety (snapshot 19-04-2012).\
+                                           When read by VASP these files yield identical results\
+                                           as the files distributed in 2012 ('unvie' release)."},
+                        'potpaw_LDA.54': {"pymatgen_key": "LDA_54",
+                                          "vasp_description": "LDA PAW datasets version 54,\
+                                           including the GW variety (original release 2015-09-04).\
+                                           When read by VASP these files yield identical results as\
+                                           the files distributed before."},
+                        'potpaw_PBE': {"pymatgen_key": "PBE",
+                                       "vasp_description": "The LDA, PW91 and PBE PAW datasets\
+                                        (snapshot: 05-05-2010, 19-09-2006 and 06-05-2010,\
+                                        respectively). These files are outdated, not\
+                                        supported and only distributed as is."},
+                        'potpaw_PBE.52': {"pymatgen_key": "PBE_52",
+                                          "vasp_description": "PBE PAW datasets version 52,\
+                                           including early GW variety (snapshot 19-04-2012).\
+                                           When read by VASP these files yield identical\
+                                           results as the files distributed in 2012."},
+                        'potpaw_PBE.54': {"pymatgen_key": "PBE_54",
+                                          "vasp_description": "PBE PAW datasets version 54,\
+                                           including the GW variety (original release 2015-09-04).\
+                                           When read by VASP these files yield identical results as\
+                                           the files distributed before."},
+                        'unvie_potpaw.52': {"pymatgen_key": "unvie_LDA_52",
+                                            "vasp_description": "files released previously\
+                                             for vasp.5.2 (2012-04) and vasp.5.4 (2015-09-04)\
+                                             by univie."},
+                        'unvie_potpaw.54': {"pymatgen_key": "unvie_LDA_54",
+                                            "vasp_description": "files released previously\
+                                             for vasp.5.2 (2012-04) and vasp.5.4 (2015-09-04)\
+                                             by univie."},
+                        'unvie_potpaw_PBE.52': {"pymatgen_key": "unvie_PBE_52",
+                                                "vasp_description": "files released previously\
+                                                for vasp.5.2 (2012-04) and vasp.5.4 (2015-09-04)\
+                                                by univie."},
+                        'unvie_potpaw_PBE.54': {"pymatgen_key": "unvie_PBE_52",
+                                                "vasp_description": "files released previously\
+                                                for vasp.5.2 (2012-04) and vasp.5.4 (2015-09-04)\
+                                                by univie."}
+                        }
+
+        cwd = os.path.abspath(os.path.dirname(__file__))
+
+        if mode == 'data':
+            hash_db = loadfn(os.path.join(cwd, "vasp_potcar_pymatgen_hashes.json"))
+            potcar_hash = self.hash
+        elif mode == 'file':
+            hash_db = loadfn(os.path.join(cwd, "vasp_potcar_file_hashes.json"))
+            potcar_hash = self.file_hash
+        else:
+            raise ValueError("Bad 'mode' argument. Specify 'data' or 'file'.")
+
+        identity = hash_db.get(potcar_hash)
+
+        if identity:
+            # convert the potcar_functionals from the .json dict into the functional
+            # keys that pymatgen uses
+            potcar_functionals = []
+            for i in identity["potcar_functionals"]:
+                potcar_functionals.append(mapping_dict[i]["pymatgen_key"])
+            potcar_functionals = list(set(potcar_functionals))
+
+            return potcar_functionals, identity["potcar_symbols"]
+        return [], []
+
+    def get_potcar_file_hash(self):
+        """
+        Computes a hash of the entire PotcarSingle.
+
+        This hash corresponds to the md5 hash of the POTCAR file itself.
+
+        :return: Hash value.
+        """
+        return md5(self.data.encode("utf-8")).hexdigest()
+
     def get_potcar_hash(self):
         """
-        Computes a hash for the PotcarSingle.
+        Computes a md5 hash of the data defining the PotcarSingle.
 
         :return: Hash value.
         """
@@ -2124,8 +2248,7 @@ class Potcar(list, MSONable):
             functionals.append(single.functional)
         if len(set(functionals)) != 1:
             raise ValueError("File contains incompatible functionals!")
-        else:
-            potcar.functional = functionals[0]
+        potcar.functional = functionals[0]
         return potcar
 
     def __str__(self):
