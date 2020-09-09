@@ -111,7 +111,7 @@ class DDEC6Analysis:
         rs = subprocess.Popen(args,
                               stdout=subprocess.PIPE,
                               stdin=subprocess.PIPE, close_fds=True)
-        # stdout, stderr = rs.communicate()
+        stdout, stderr = rs.communicate()
         if rs.returncode != 0:
             raise RuntimeError("DDEC6 exited with return code %d. "
                                "Please check your DDEC6 installation."
