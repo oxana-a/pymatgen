@@ -28,8 +28,8 @@ from pymatgen.core.surface import generate_all_slabs
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 
-from pymatgen.io.vasp.outputs import Vasprun
-from atomate.vasp.firetasks.adsorption import time_vrun
+#from pymatgen.io.vasp.outputs import Vasprun
+#from atomate.vasp.firetasks.adsorption_tasks import time_vrun
 
 from matplotlib import patches
 from matplotlib.path import Path
@@ -721,53 +721,53 @@ def plot_slab(slab, ax, scale=0.8, repeat=5, window=1.5, draw_unit_cell=True,
     ax.set_ylim(y_lim)
     return ax
 
-## AdsorptionWorkflowAnalysis
-class BulkEntry:
-    def __init__(self, **kwargs):
-        self.input_bulk = kwargs.get("input_bulk")
-        self.bulk_energy = kwargs.get("bulk_energy")
-        self.output_bulk = kwargs.get("output_bulk")
-        self.eigenvalue_band_properties = \
-            kwargs.get("eigenvalue_band_props")
-
-    @staticmethod
-    def from_folder(bulk_dir="."):
-        vrun_paths = [
-            os.path.join(bulk_dir, fname) for fname in
-            os.listdir(bulk_dir) if "vasprun" in fname.lower()]
-        try:
-            vrun_paths.sort(key=lambda x: time_vrun(x))
-            vrun_i = Vasprun(vrun_paths[0])
-            vrun_o = Vasprun(vrun_paths[-1])
-        except:
-            raise("Parse Error")
-        d = {}
-        d['bulk_energy'] = vrun_o.final_energy
-        d['output_bulk'] = vrun_o.final_structure
-        d['eigenvalue_band_props'] = vrun_o.eigenvalue_band_properties
-        d['input_bulk'] = vrun_i.initial_structure
-        return BulkEntry(**d)
-
-
-class SlabRelaxEntry:
-    def __init__(self):
-        pass
-
-class SlabDoSEntry:
-    def __init__(self):
-        pass
-
-
-class AdsorptionEntry:
-    def __init__(self):
-        pass
-
-
-class AdsorptionDoSEntry:
-    def __init__(self):
-        pass
-
-
-class AdsorptionEnergySlabEntries:
-    def __init__(self, entries, adsorbates):
-        pass
+# ## AdsorptionWorkflowAnalysis
+# class BulkEntry:
+#     def __init__(self, **kwargs):
+#         self.input_bulk = kwargs.get("input_bulk")
+#         self.bulk_energy = kwargs.get("bulk_energy")
+#         self.output_bulk = kwargs.get("output_bulk")
+#         self.eigenvalue_band_properties = \
+#             kwargs.get("eigenvalue_band_props")
+#
+#     @staticmethod
+#     def from_folder(bulk_dir="."):
+#         vrun_paths = [
+#             os.path.join(bulk_dir, fname) for fname in
+#             os.listdir(bulk_dir) if "vasprun" in fname.lower()]
+#         try:
+#             vrun_paths.sort(key=lambda x: time_vrun(x))
+#             vrun_i = Vasprun(vrun_paths[0])
+#             vrun_o = Vasprun(vrun_paths[-1])
+#         except:
+#             raise("Parse Error")
+#         d = {}
+#         d['bulk_energy'] = vrun_o.final_energy
+#         d['output_bulk'] = vrun_o.final_structure
+#         d['eigenvalue_band_props'] = vrun_o.eigenvalue_band_properties
+#         d['input_bulk'] = vrun_i.initial_structure
+#         return BulkEntry(**d)
+#
+#
+# class SlabRelaxEntry:
+#     def __init__(self):
+#         pass
+#
+# class SlabDoSEntry:
+#     def __init__(self):
+#         pass
+#
+#
+# class AdsorptionEntry:
+#     def __init__(self):
+#         pass
+#
+#
+# class AdsorptionDoSEntry:
+#     def __init__(self):
+#         pass
+#
+#
+# class AdsorptionEnergySlabEntries:
+#     def __init__(self, entries, adsorbates):
+#         pass
