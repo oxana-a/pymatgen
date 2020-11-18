@@ -96,12 +96,12 @@ class Slab(Structure):
                 simply as any 2D array. Each row should correspond to a lattice
                 vector. E.g., [[10,0,0], [20,10,0], [0,0,30]] specifies a
                 lattice with lattice vectors [10,0,0], [20,10,0] and [0,0,30].
-            species ([Specie]): Sequence of species on each site. Can take in
+            species ([Species]): Sequence of species on each site. Can take in
                 flexible input, including:
 
-                i.  A sequence of element / specie specified either as string
+                i.  A sequence of element / species specified either as string
                     symbols, e.g. ["Li", "Fe2+", "P", ...] or atomic numbers,
-                    e.g., (3, 56, ...) or actual Element or Specie objects.
+                    e.g., (3, 56, ...) or actual Element or Species objects.
 
                 ii. List of dict of elements/species and occupancies, e.g.,
                     [{"Fe" : 0.5, "Mn":0.5}, ...]. This allows the setup of
@@ -119,10 +119,10 @@ class Slab(Structure):
             scale_factor (np.ndarray): scale_factor Final computed scale factor
                 that brings the parent cell to the surface cell.
             reorient_lattice (bool): reorients the lattice parameters such that
-                the c direction is the third vector of the lattice matrix
+                the c direction is along the z axis.
             validate_proximity (bool): Whether to check if there are sites
                 that are less than 0.01 Ang apart. Defaults to False.
-            reconstruction (str): Type of reconstruction. Defaultst to None if
+            reconstruction (str): Type of reconstruction. Defaults to None if
                 the slab is not reconstructed.
             coords_are_cartesian (bool): Set to True if you are providing
                 coordinates in cartesian coordinates. Defaults to False.
@@ -139,10 +139,14 @@ class Slab(Structure):
         self.scale_factor = np.array(scale_factor)
         self.energy = energy
         self.reorient_lattice = reorient_lattice
-        lattice = Lattice.from_parameters(lattice.a, lattice.b, lattice.c,
-                                          lattice.alpha, lattice.beta,
-                                          lattice.gamma) \
-            if self.reorient_lattice else lattice
+        if self.reorient_lattice:
+            if coords_are_cartesian:
+                coords = lattice.get_fractional_coords(coords)
+                coords_are_cartesian = False
+            lattice = Lattice.from_parameters(lattice.a, lattice.b, lattice.c,
+                                              lattice.alpha, lattice.beta,
+                                              lattice.gamma)
+
         super().__init__(
             lattice, species, coords, validate_proximity=validate_proximity,
             to_unit_cell=to_unit_cell,
@@ -399,7 +403,7 @@ class Slab(Structure):
             indices ([int]): Indices of sites on which to put the absorbate.
                 Absorbed atom will be displaced relative to the center of
                 these sites.
-            specie (Specie/Element/str): adsorbed atom species
+            specie (Species/Element/str): adsorbed atom species
             distance (float): between centers of the adsorbed atom and the
                 given site in Angstroms.
         """

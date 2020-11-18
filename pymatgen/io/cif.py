@@ -26,7 +26,7 @@ from pymatgen.core.composition import Composition
 from pymatgen.core.lattice import Lattice
 from pymatgen.core.operations import MagSymmOp
 from pymatgen.core.operations import SymmOp
-from pymatgen.core.periodic_table import Element, Specie, get_el_sp, DummySpecie
+from pymatgen.core.periodic_table import Element, Species, get_el_sp, DummySpecies
 from pymatgen.core.structure import Structure
 from pymatgen.electronic_structure.core import Magmom
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -970,9 +970,9 @@ class CifParser:
                     oxi_symbol = data["_atom_site_type_symbol"][i]
                     o_s = oxi_states.get(oxi_symbol, o_s)
                 try:
-                    el = Specie(symbol, o_s)
+                    el = Species(symbol, o_s)
                 except Exception:
-                    el = DummySpecie(symbol, o_s)
+                    el = DummySpecies(symbol, o_s)
             else:
                 el = get_el_sp(symbol)
 
@@ -1024,9 +1024,9 @@ class CifParser:
             for k, v in coord_to_magmoms.items():
                 if v is None:
                     # Proposed solution to this is to instead store magnetic
-                    # moments as Specie 'spin' property, instead of site
+                    # moments as Species 'spin' property, instead of site
                     # property, but this introduces ambiguities for end user
-                    # (such as unintended use of `spin` and Specie will have
+                    # (such as unintended use of `spin` and Species will have
                     # fictious oxidation state).
                     raise NotImplementedError(
                         'Disordered magnetic structures not currently supported.')
@@ -1214,13 +1214,13 @@ class CifWriter:
     A wrapper around CifFile to write CIF files from pymatgen structures.
     """
     def __init__(self, struct, symprec=None, write_magmoms=False,
-                 significant_figures=8, angle_tolerance=5.0):
+                 significant_figures=8, angle_tolerance=5.0, refine_struct=True):
         """
         Args:
             struct (Structure): structure to write
             symprec (float): If not none, finds the symmetry of the structure
                 and writes the cif with symmetry information. Passes symprec
-                to the SpacegroupAnalyzer.
+                to the SpacegroupAnalyzer. See also refine_struct.
             write_magmoms (bool): If True, will write magCIF file. Incompatible
                 with symprec
             significant_figures (int): Specifies precision for formatting of floats.
@@ -1228,6 +1228,8 @@ class CifWriter:
             angle_tolerance (float): Angle tolerance for symmetry finding. Passes
                 angle_tolerance to the SpacegroupAnalyzer. Used only if symprec
                 is not None.
+            refine_struct: Used only if symprec is not None. If True, get_refined_structure
+                is invoked to convert input structure from primitive to conventional.
         """
 
         if write_magmoms and symprec:
@@ -1245,9 +1247,11 @@ class CifWriter:
             sf = SpacegroupAnalyzer(struct, symprec, angle_tolerance=angle_tolerance)
             spacegroup = (sf.get_space_group_symbol(),
                           sf.get_space_group_number())
-            # Needs the refined struture when using symprec. This converts
-            # primitive to conventional structures, the standard for CIF.
-            struct = sf.get_refined_structure()
+
+            if refine_struct:
+                # Needs the refined structure when using symprec. This converts
+                # primitive to conventional structures, the standard for CIF.
+                struct = sf.get_refined_structure()
 
         latt = struct.lattice
         comp = struct.composition
