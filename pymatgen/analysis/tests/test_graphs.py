@@ -3,33 +3,31 @@
 # Distributed under the terms of the MIT License.
 
 
-import unittest
-import os
 import copy
+import os
+import unittest
 
 from monty.serialization import loadfn  # , dumpfn
 
-from pymatgen.command_line.critic2_caller import Critic2Analysis
-from pymatgen.core.structure import Molecule, Structure, FunctionalGroups, Site
 from pymatgen.analysis.graphs import *
 from pymatgen.analysis.local_env import (
+    CovalentBondNN,
+    CutOffDictNN,
     MinimumDistanceNN,
     MinimumOKeeffeNN,
     OpenBabelNN,
-    CutOffDictNN,
     VoronoiNN,
-    CovalentBondNN
 )
+from pymatgen.command_line.critic2_caller import Critic2Analysis
+from pymatgen.core.structure import FunctionalGroups, Molecule, Site, Structure
 from pymatgen.util.testing import PymatgenTest
+
 try:
     from openbabel import openbabel as ob
 except ImportError:
     ob = None
-try:
-    import networkx as nx
-    import networkx.algorithms.isomorphism as iso
-except ImportError:
-    nx = None
+import networkx as nx
+import networkx.algorithms.isomorphism as iso
 
 __author__ = "Matthew Horton, Evan Spotte-Smith"
 __version__ = "0.1"
@@ -112,9 +110,7 @@ class StructureGraphTest(PymatgenTest):
             )
         )
         c2o = Critic2Analysis(self.structure, reference_stdout)
-        self.mos2_sg = c2o.structure_graph(
-            include_critical_points=False
-        )
+        self.mos2_sg = c2o.structure_graph(include_critical_points=False)
 
         latt = Lattice.cubic(4.17)
         species = ["Ni", "O"]
@@ -184,7 +180,6 @@ class StructureGraphTest(PymatgenTest):
         self.assertEqual(len(nacl_graph.get_connected_sites(1)), 12)
         self.assertEqual(len(nacl_graph.graph.get_edge_data(1, 1)), 12)
 
-    @unittest.skipIf(not nx, "NetworkX not present. Skipping...")
     def test_set_node_attributes(self):
         self.square_sg.set_node_attributes()
 
@@ -239,9 +234,12 @@ class StructureGraphTest(PymatgenTest):
         self.assertEqual(square_copy.get_coordination_of_site(1), 1)
 
         # Test that StructureGraph.graph is correctly updated
-        square_copy.insert_node(1, "H", [0.5, 0.5, 0.75], edges=[{"from_index": 1,
-                                                                  "to_index": 2,
-                                                                  "to_jimage": (0, 0, 0)}])
+        square_copy.insert_node(
+            1,
+            "H",
+            [0.5, 0.5, 0.75],
+            edges=[{"from_index": 1, "to_index": 2, "to_jimage": (0, 0, 0)}],
+        )
         square_copy.remove_nodes([1])
         self.assertEqual(square_copy.graph.number_of_nodes(), 2)
         self.assertEqual(square_copy.graph.number_of_edges(), 5)
@@ -470,7 +468,7 @@ from    to  to_image
             "bc_square_single.pdf",
             "bc_square.pdf",
             "MoS2_premul.pdf",
-            "MOS2_single.pdf",
+            "MoS2_single.pdf",
             "MoS2_twice_mul.pdf",
             "MoS2.pdf",
             "square_single.pdf",
@@ -751,7 +749,6 @@ class MoleculeGraphTest(unittest.TestCase):
             str(self.cyclohexene.get_connected_sites(0)[0].site.specie), "H"
         )
 
-    @unittest.skipIf(not nx, "NetworkX not present. Skipping...")
     def test_set_node_attributes(self):
         self.ethylene.set_node_attributes()
 
@@ -815,7 +812,6 @@ class MoleculeGraphTest(unittest.TestCase):
         self.assertEqual(eth_copy.graph.number_of_nodes(), 5)
         self.assertEqual(eth_copy.graph.number_of_edges(), 2)
 
-    @unittest.skipIf(not nx, "NetworkX not present. Skipping...")
     def test_split(self):
         bonds = [(0, 1), (4, 5)]
         alterations = {
@@ -880,7 +876,6 @@ class MoleculeGraphTest(unittest.TestCase):
                     atom = split_mg.molecule[j]
                     self.assertEqual(species[j], str(atom.specie))
 
-    @unittest.skipIf(not nx, "NetworkX not present. Skipping...")
     def test_build_unique_fragments(self):
         edges = {(e[0], e[1]): None for e in self.pc_edges}
         mol_graph = MoleculeGraph.with_edges(self.pc, edges)

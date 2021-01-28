@@ -8,12 +8,11 @@ This module provides classes that define a chemical reaction.
 
 import logging
 import re
-from itertools import combinations, chain
+from itertools import chain, combinations
 
 import numpy as np
 from monty.fractions import gcd_float
-from monty.json import MSONable
-from monty.json import MontyDecoder
+from monty.json import MontyDecoder, MSONable
 from uncertainties import ufloat
 
 from pymatgen.core.composition import Composition
@@ -107,7 +106,7 @@ class BalancedReaction(MSONable):
         Another factor can be specified.
 
         Args:
-            element (Element/Specie): Element to normalize to.
+            element (Element/Species): Element to normalize to.
             factor (float): Factor to normalize to. Defaults to 1.
         """
         all_comp = self._all_comp
@@ -124,7 +123,7 @@ class BalancedReaction(MSONable):
         Returns the amount of the element in the reaction.
 
         Args:
-            element (Element/Specie): Element in the reaction
+            element (Element/Species): Element in the reaction
 
         Returns:
             Amount of that element in the reaction.
@@ -478,11 +477,15 @@ class ComputedReaction(Reaction):
         self._reactant_entries = reactant_entries
         self._product_entries = product_entries
         self._all_entries = reactant_entries + product_entries
-        reactant_comp = [e.composition.get_reduced_composition_and_factor()[0]
-                         for e in reactant_entries]
+        reactant_comp = [
+            e.composition.get_reduced_composition_and_factor()[0]
+            for e in reactant_entries
+        ]
 
-        product_comp = [e.composition.get_reduced_composition_and_factor()[0]
-                        for e in product_entries]
+        product_comp = [
+            e.composition.get_reduced_composition_and_factor()[0]
+            for e in product_entries
+        ]
 
         super().__init__(list(reactant_comp), list(product_comp))
 
@@ -527,9 +530,7 @@ class ComputedReaction(Reaction):
 
         for entry in self._reactant_entries + self._product_entries:
             (comp, factor) = entry.composition.get_reduced_composition_and_factor()
-            energy_ufloat = ufloat(
-                entry.energy, entry.correction_uncertainty
-            )
+            energy_ufloat = ufloat(entry.energy, entry.correction_uncertainty)
             calc_energies[comp] = min(
                 calc_energies.get(comp, float("inf")), energy_ufloat / factor
             )
