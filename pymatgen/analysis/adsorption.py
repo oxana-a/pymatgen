@@ -762,11 +762,6 @@ def plot_slab(
     corner = slab.lattice.get_cartesian_coords(corner)[:2]
     verts = orig_cell[:2, :2]
     lattsum = verts[0] + verts[1]
-    # inverse coords, sites, alphas, to show other side of slab
-    if inverse:
-        alphas = np.array(reversed(alphas))
-        sites = list(reversed(sites))
-        coords = np.array(reversed(coords))
     # Draw circles at sites and stack them accordingly
     for n, coord in enumerate(coords):
         r = sites[n].specie.atomic_radius * scale

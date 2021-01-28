@@ -26,10 +26,10 @@ class DDEC6Analysis:
     """
     DDEC6 Analysis
     """
-    @requires(which("Chargemol") or which("Chargemol.exe"),
-              "DDEC6Analysis requires the executable Chargemol to be in the "
-              "system path. Please download the library at "
-              "http://sourceforge.com/ddec6")
+    # @requires(which("Chargemol") or which("Chargemol.exe"),
+    #           "DDEC6Analysis requires the executable Chargemol to be in the "
+    #           "system path. Please download the library at "
+    #           "http://sourceforge.com/ddec6")
     def __init__(self, chgcar_filename="CHGCAR.gz",
                  potcar_filename="POTCAR.gz",
                  aeccar_filenames=None, run=True, ad_dir=None,
@@ -192,15 +192,15 @@ class DDEC6Analysis:
         :return: bond order index
         """
         if not self.bond_orders[index_from].get("all_bonds", False):
-            print(
-                "DDEC6 did not find specie {} to be connected to any specie".format(
-                    index_from))
+            # print(
+            #     "DDEC6 did not find specie {} to be connected to any specie".format(
+            #         index_from))
             return None
         elif not self.bond_orders[index_from].get("all_bonds", {}).get(
                 index_to, False):
-            print(
-                "DDEC6 did not find specie {} to be connected to specie {}".format(
-                    index_from, index_to))
+            # print(
+            #     "DDEC6 did not find specie {} to be connected to specie {}".format(
+            #         index_from, index_to))
             return None
         else:
             return self.bond_orders[index_from].get("all_bonds", {}).get(
