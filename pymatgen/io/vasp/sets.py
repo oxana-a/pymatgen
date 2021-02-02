@@ -2498,6 +2498,12 @@ class MVLSlabSet(MPRelaxSet):
         # attributes aren't going to affect the VASP inputs anyways so
         # converting the slab into a structure should not matter
 
+        settings = self.user_kpoints_settings or self._config_dict.get(
+            "KPOINTS")
+
+        if isinstance(settings, Kpoints):
+            return settings
+
         kpt = super().kpoints
         kpt.comment = "Automatic mesh"
         kpt.style = "Gamma"
