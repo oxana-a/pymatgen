@@ -3,12 +3,11 @@
 
 import os
 import unittest
-
 import pytest
 
-from pymatgen.analysis.fragmenter import Fragmenter, metal_edge_extender
+from pymatgen.analysis.fragmenter import Fragmenter
 from pymatgen.analysis.graphs import MoleculeGraph
-from pymatgen.analysis.local_env import OpenBabelNN
+from pymatgen.analysis.local_env import OpenBabelNN, metal_edge_extender
 from pymatgen.core.structure import Molecule
 from pymatgen.util.testing import PymatgenTest
 
@@ -63,9 +62,7 @@ class TestFragmentMolecule(PymatgenTest):
         cls.LiEC = Molecule.from_file(os.path.join(test_dir, "LiEC.xyz"))
 
     def test_edges_given_PC_frag1(self):
-        fragmenter = Fragmenter(
-            molecule=self.pc_frag1, edges=self.pc_frag1_edges, depth=0
-        )
+        fragmenter = Fragmenter(molecule=self.pc_frag1, edges=self.pc_frag1_edges, depth=0)
         self.assertEqual(fragmenter.total_unique_fragments, 12)
 
     def test_babel_PC_frag1(self):
@@ -78,9 +75,7 @@ class TestFragmentMolecule(PymatgenTest):
         fragmenter = Fragmenter(molecule=self.pc, open_rings=True)
         self.assertEqual(fragmenter.open_rings, True)
         self.assertEqual(fragmenter.opt_steps, 10000)
-        default_mol_graph = MoleculeGraph.with_local_env_strategy(
-            self.pc, OpenBabelNN()
-        )
+        default_mol_graph = MoleculeGraph.with_local_env_strategy(self.pc, OpenBabelNN())
         self.assertEqual(fragmenter.mol_graph, default_mol_graph)
         self.assertEqual(fragmenter.total_unique_fragments, 13)
 
@@ -89,9 +84,7 @@ class TestFragmentMolecule(PymatgenTest):
         fragmenter = Fragmenter(molecule=self.pc)
         self.assertEqual(fragmenter.open_rings, False)
         self.assertEqual(fragmenter.opt_steps, 10000)
-        default_mol_graph = MoleculeGraph.with_local_env_strategy(
-            self.pc, OpenBabelNN()
-        )
+        default_mol_graph = MoleculeGraph.with_local_env_strategy(self.pc, OpenBabelNN())
         self.assertEqual(fragmenter.mol_graph, default_mol_graph)
         self.assertEqual(fragmenter.total_unique_fragments, 8)
 
@@ -121,14 +114,10 @@ class TestFragmentMolecule(PymatgenTest):
 
     def test_babel_PC_with_RO_depth_0_vs_depth_10(self):
         pytest.importorskip("openbabel", reason="OpenBabel not installed")
-        fragmenter0 = Fragmenter(
-            molecule=self.pc, depth=0, open_rings=True, opt_steps=1000
-        )
+        fragmenter0 = Fragmenter(molecule=self.pc, depth=0, open_rings=True, opt_steps=1000)
         self.assertEqual(fragmenter0.total_unique_fragments, 509)
 
-        fragmenter10 = Fragmenter(
-            molecule=self.pc, depth=10, open_rings=True, opt_steps=1000
-        )
+        fragmenter10 = Fragmenter(molecule=self.pc, depth=10, open_rings=True, opt_steps=1000)
         self.assertEqual(fragmenter10.total_unique_fragments, 509)
 
         fragments_by_level = fragmenter10.fragments_by_level
@@ -140,14 +129,10 @@ class TestFragmentMolecule(PymatgenTest):
             self.assertEqual(num_frags, num_frags_by_level[ii])
 
     def test_PC_depth_0_vs_depth_10(self):
-        fragmenter0 = Fragmenter(
-            molecule=self.pc, edges=self.pc_edges, depth=0, open_rings=False
-        )
+        fragmenter0 = Fragmenter(molecule=self.pc, edges=self.pc_edges, depth=0, open_rings=False)
         self.assertEqual(fragmenter0.total_unique_fragments, 295)
 
-        fragmenter10 = Fragmenter(
-            molecule=self.pc, edges=self.pc_edges, depth=10, open_rings=False
-        )
+        fragmenter10 = Fragmenter(molecule=self.pc, edges=self.pc_edges, depth=10, open_rings=False)
         self.assertEqual(fragmenter10.total_unique_fragments, 63)
 
         fragments_by_level = fragmenter10.fragments_by_level
@@ -181,27 +166,6 @@ class TestFragmentMolecule(PymatgenTest):
         )
         self.assertEqual(fragEC.new_unique_fragments, 11)
         self.assertEqual(fragEC.total_unique_fragments, 509 + 11)
-
-    def test_metal_edge_extender(self):
-        mol_graph = MoleculeGraph.with_edges(
-            molecule=self.LiEC,
-            edges={
-                (0, 2): None,
-                (0, 1): None,
-                (1, 3): None,
-                (1, 4): None,
-                (2, 7): None,
-                (2, 5): None,
-                (2, 8): None,
-                (3, 6): None,
-                (4, 5): None,
-                (5, 9): None,
-                (5, 10): None,
-            },
-        )
-        self.assertEqual(len(mol_graph.graph.edges), 11)
-        extended_mol_graph = metal_edge_extender(mol_graph)
-        self.assertEqual(len(mol_graph.graph.edges), 12)
 
 
 if __name__ == "__main__":

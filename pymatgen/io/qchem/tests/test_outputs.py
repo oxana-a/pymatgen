@@ -20,7 +20,7 @@ try:
 except ImportError:
     have_babel = False
 
-__author__ = "Samuel Blau, Brandon Wood, Shyam Dwaraknath"
+__author__ = "Samuel Blau, Brandon Wood, Shyam Dwaraknath, Evan Spotte-Smith"
 __copyright__ = "Copyright 2018, The Materials Project"
 __version__ = "0.1"
 
@@ -87,6 +87,12 @@ property_list = {
     "CDS_gradients",
     "RESP",
     "trans_dip",
+    "transition_state",
+    "scan_job",
+    "optimized_geometries",
+    "molecules_from_optimized_geometries",
+    "scan_energies",
+    "scan_constraint_sets",
 }
 
 if have_babel:
@@ -147,6 +153,9 @@ single_job_out_names = {
     "new_qchem_files/1570_2.qout",
     "new_qchem_files/single_point.qout",
     "new_qchem_files/roothaan_diis_gdm.qout",
+    "new_qchem_files/pes_scan_single_variable.qout",
+    "new_qchem_files/pes_scan_double_variable.qout",
+    "new_qchem_files/ts.out",
 }
 
 multi_job_out_names = {
@@ -199,15 +208,12 @@ class TestQCOutput(PymatgenTest):
         for name, outputs in multi_outs.items():
             for ii, sub_output in enumerate(outputs):
                 try:
-                    self.assertEqual(
-                        sub_output.data.get(key), multi_job_dict[name][ii].get(key)
-                    )
+                    self.assertEqual(sub_output.data.get(key), multi_job_dict[name][ii].get(key))
                 except ValueError:
-                    self.assertArrayEqual(
-                        sub_output.data.get(key), multi_job_dict[name][ii].get(key)
-                    )
+                    self.assertArrayEqual(sub_output.data.get(key), multi_job_dict[name][ii].get(key))
 
     def test_all(self):
+        self.maxDiff = None
         single_outs = dict()
         for file in single_job_out_names:
             single_outs[file] = QCOutput(os.path.join(PymatgenTest.TEST_FILES_DIR, "molecules", file)).data
@@ -252,9 +258,7 @@ class TestQCOutput(PymatgenTest):
         self.assertEqual(check_for_structure_changes(t1, t2), "fewer_bonds")
         self.assertEqual(check_for_structure_changes(t2, t1), "more_bonds")
 
-        self.assertEqual(
-            check_for_structure_changes(thio_1, thio_2), "unconnected_fragments"
-        )
+        self.assertEqual(check_for_structure_changes(thio_1, thio_2), "unconnected_fragments")
 
         self.assertEqual(check_for_structure_changes(frag_1, frag_2), "bond_change")
 

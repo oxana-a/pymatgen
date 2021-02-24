@@ -1,6 +1,6 @@
 Change log
 ==========
 
-v2020.12.31
------------
-* End of 2020 release with minor bug fixes for cli scripts.
+v2021.2.16
+----------
+* Add a new interface to OPTIMADE-compliant APIs in pymatgen.ext.optimade (@mkhorton, #2066)

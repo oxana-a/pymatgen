@@ -10,10 +10,7 @@ store calculated information. Other Entry classes such as ComputedEntry
 and PDEntry inherit from this class.
 """
 
-import copy
-
 from numbers import Number
-from typing import Optional
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
@@ -90,16 +87,12 @@ class Entry(MSONable, metaclass=ABCMeta):
         return self.energy / self.composition.num_atoms
 
     def __repr__(self):
-        return "{} : {} with energy = {:.4f}".format(
-            self.__class__.__name__, self.composition, self.energy
-        )
+        return "{} : {} with energy = {:.4f}".format(self.__class__.__name__, self.composition, self.energy)
 
     def __str__(self):
         return self.__repr__()
 
-    def normalize(
-        self, mode: str = "formula_unit", inplace: bool = True
-    ) -> Optional["Entry"]:
+    def normalize(self, mode: str = "formula_unit") -> "Entry":
         """
         Normalize the entry's composition and energy.
 
@@ -107,18 +100,17 @@ class Entry(MSONable, metaclass=ABCMeta):
             mode: "formula_unit" is the default, which normalizes to
                 composition.reduced_formula. The other option is "atom", which
                 normalizes such that the composition amounts sum to 1.
-            inplace: "True" is the default which normalises the current Entry object.
-                Setting inplace to "False" returns a normalized copy of the Entry object.
         """
-        if inplace:
-            factor = self._normalization_factor(mode)
-            self._composition /= factor
-            self._energy /= factor
-            return None
 
-        entry = copy.deepcopy(self)
-        entry.normalize(mode, inplace=True)
-        return entry
+        factor = self._normalization_factor(mode)
+        new_composition = self._composition / factor
+        new_energy = self._energy / factor
+
+        new_entry_dict = self.as_dict()
+        new_entry_dict["composition"] = new_composition.as_dict()
+        new_entry_dict["energy"] = new_energy
+
+        return self.from_dict(new_entry_dict)
 
     def _normalization_factor(self, mode: str = "formula_unit") -> float:
         # NOTE here we use composition rather than _composition in order to ensure
@@ -129,9 +121,7 @@ class Entry(MSONable, metaclass=ABCMeta):
         elif mode == "formula_unit":
             factor = self.composition.get_reduced_composition_and_factor()[1]
         else:
-            raise ValueError(
-                "`{}` is not an allowed option for normalization".format(mode)
-            )
+            raise ValueError("`{}` is not an allowed option for normalization".format(mode))
 
         return factor
 
@@ -143,19 +133,23 @@ class Entry(MSONable, metaclass=ABCMeta):
             "@module": self.__class__.__module__,
             "@class": self.__class__.__name__,
             "energy": self._energy,
-            "composition": self._composition.as_dict()
+            "composition": self._composition.as_dict(),
         }
 
     def __eq__(self, other):
-        # NOTE Scaled duplicates i.e. physically equivalent materials
-        # are not equal unless normalized separately
+        # NOTE: Scaled duplicates i.e. physically equivalent materials
+        # are not equal unless normalized separately.
         if self is other:
             return True
 
-        if isinstance(other, self.__class__):
-            return self._is_dict_eq(other)
+        # Equality is defined based on composition and energy
+        # If structures are involved, it is assumed that a {composition, energy} is
+        # vanishingly unlikely to be the same if the structures are different
 
-        return False
+        if not np.allclose(self.energy, other.energy):
+            return False
+
+        return self.composition == other.composition
 
     def _is_dict_eq(self, other):
         """
@@ -171,11 +165,7 @@ class Entry(MSONable, metaclass=ABCMeta):
     def __hash__(self):
         # NOTE truncate _energy to 8 dp to ensure same robustness
         # as np.allclose
-        return hash(
-            f"{self.__class__.__name__}"
-            f"{self._composition.formula}"
-            f"{self._energy:.8f}"
-        )
+        return hash(f"{self.__class__.__name__}" f"{self._composition.formula}" f"{self._energy:.8f}")
 
 
 def _is_robust_eq(v_self, v_other):
