@@ -140,10 +140,23 @@ class DDEC6Analysis:
                   "r") as f:
             overlap_populations_lines = [line.strip() for line in f]
 
+        with open("DDEC_atomic_Rcubed_moments.xyz",
+                  "r") as f:
+            Rcubed_moments = [line.strip() for line in f]
+        with open("DDEC_atomic_Rfourth_moments.xyz",
+                  "r") as f:
+            Rfourth_moments = [line.strip() for line in f]
+        with open("DDEC_atomic_Rsquared_moments.xyz",
+                  "r") as f:
+            Rsquared_moments = [line.strip() for line in f]
+
         self.raw_data = {
             "atomic_charges": atomic_charges_lines,
             "bond_orders": bond_orders_lines,
             "overlap_populations": overlap_populations_lines,
+            "r_fourth":Rfourth_moments,
+            "r_squared":Rsquared_moments,
+            "r_cubed":Rcubed_moments,
         }
 
         self._get_charge_info()
