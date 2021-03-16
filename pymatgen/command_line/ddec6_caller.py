@@ -159,7 +159,7 @@ class DDEC6Analysis:
             "r_cubed":Rcubed_moments,
         }
 
-        self._get_charge_info()
+        self._get_charge_and_dipole_info()
         self._get_bond_order_info()
 
     def get_charge_transfer(self, index=None, element=None, ):
@@ -293,7 +293,7 @@ class DDEC6Analysis:
             for line in lines:
                 fh.write('%s\n' % line)
 
-    def _get_charge_info(self):
+    def _get_charge_and_dipole_info(self):
         """
         Internal command to process atomic charges, species, and coordinates
         """
@@ -301,10 +301,19 @@ class DDEC6Analysis:
         self.atomic_charges = []
         self.species = []
         self.coords = []
+        self.dipoles = []
         for line in self.raw_data["atomic_charges"][2:2 + self.species_count]:
             self.atomic_charges.append(float(line.split()[-1]))
             self.species.append(Element(line.split()[0]))
             self.coords.append(line.split()[1:-2])
+
+        n = [n for n, data in enumerate(
+            self.raw_data['atomic_charges']) if 'The ' in data][0]
+        self.dipoles = [
+            s.split()[6:9] for s in self.raw_data[
+                                        'atomic_charges'][
+                                    n+2:n+2+self.species_count]]
+
 
     def _get_bond_order_info(self):
         """
@@ -400,4 +409,5 @@ class DDEC6Analysis:
         structure.add_site_property("atomic_charges_ddec6",
                                     self.atomic_charges)
         structure.add_site_property("bond_orders_ddec6", self.bond_orders)
+        structure.add_site_property("dipole_ddec6",self.dipoles)
         return structure
