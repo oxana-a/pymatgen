@@ -181,7 +181,7 @@ class DDEC6Analysis:
                     charges.append(c_charges)
             return np.average(charges)
         else:
-            return self.atomic_charges
+            return -self.atomic_charges
 
     def get_charge(self, atom_index):
         """
