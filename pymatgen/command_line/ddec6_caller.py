@@ -173,7 +173,7 @@ class DDEC6Analysis:
         if index is not None:
             print(index)
             print(self.atomic_charges[index])
-            return self.atomic_charges[index]
+            return -self.atomic_charges[index]
         elif element is not None:
             charges = []
             for c_element, c_charges in zip(self.species, self.atomic_charges):
