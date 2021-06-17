@@ -482,11 +482,17 @@ class AdsorbateSiteFinder:
         structs = []
 
         find_args = find_args or {}
-        for coords in self.find_adsorption_sites(**find_args)['all']:
+        for coords in self.find_adsorption_sites(**find_args)["all"]:
             structs.append(
                 self.add_adsorbate(
-                    molecule, coords, repeat=repeat, min_lw=min_lw,
-                    translate=translate, reorient=reorient))
+                    molecule,
+                    coords,
+                    repeat=repeat,
+                    min_lw=min_lw,
+                    translate=translate,
+                    reorient=reorient,
+                )
+            )
         return structs
 
     def adsorb_both_surfaces(
@@ -682,6 +688,7 @@ def plot_slab(
     adsorption_sites=True,
     find_args=None,
     inverse=False,
+    find_args=None
 ):
     """
     Function that helps visualize the slab in a 2-D plot, for

@@ -140,13 +140,26 @@ class DDEC6Analysis:
                   "r") as f:
             overlap_populations_lines = [line.strip() for line in f]
 
+        with open("DDEC_atomic_Rcubed_moments.xyz",
+                  "r") as f:
+            Rcubed_moments = [line.strip() for line in f]
+        with open("DDEC_atomic_Rfourth_moments.xyz",
+                  "r") as f:
+            Rfourth_moments = [line.strip() for line in f]
+        with open("DDEC_atomic_Rsquared_moments.xyz",
+                  "r") as f:
+            Rsquared_moments = [line.strip() for line in f]
+
         self.raw_data = {
             "atomic_charges": atomic_charges_lines,
             "bond_orders": bond_orders_lines,
             "overlap_populations": overlap_populations_lines,
+            "r_fourth":Rfourth_moments,
+            "r_squared":Rsquared_moments,
+            "r_cubed":Rcubed_moments,
         }
 
-        self._get_charge_info()
+        self._get_charge_and_dipole_info()
         self._get_bond_order_info()
 
     def get_charge_transfer(self, index=None, element=None, ):
@@ -160,7 +173,7 @@ class DDEC6Analysis:
         if index is not None:
             print(index)
             print(self.atomic_charges[index])
-            return self.atomic_charges[index]
+            return -self.atomic_charges[index]
         elif element is not None:
             charges = []
             for c_element, c_charges in zip(self.species, self.atomic_charges):
@@ -168,7 +181,7 @@ class DDEC6Analysis:
                     charges.append(c_charges)
             return np.average(charges)
         else:
-            return self.atomic_charges
+            return -self.atomic_charges
 
     def get_charge(self, atom_index):
         """
@@ -280,7 +293,7 @@ class DDEC6Analysis:
             for line in lines:
                 fh.write('%s\n' % line)
 
-    def _get_charge_info(self):
+    def _get_charge_and_dipole_info(self):
         """
         Internal command to process atomic charges, species, and coordinates
         """
@@ -288,10 +301,19 @@ class DDEC6Analysis:
         self.atomic_charges = []
         self.species = []
         self.coords = []
+        self.dipoles = []
         for line in self.raw_data["atomic_charges"][2:2 + self.species_count]:
             self.atomic_charges.append(float(line.split()[-1]))
             self.species.append(Element(line.split()[0]))
             self.coords.append(line.split()[1:-2])
+
+        n = [n for n, data in enumerate(
+            self.raw_data['atomic_charges']) if 'The ' in data][0]
+        self.dipoles = [
+            s.split()[6:9] for s in self.raw_data[
+                                        'atomic_charges'][
+                                    n+2:n+2+self.species_count]]
+
 
     def _get_bond_order_info(self):
         """
@@ -387,4 +409,5 @@ class DDEC6Analysis:
         structure.add_site_property("atomic_charges_ddec6",
                                     self.atomic_charges)
         structure.add_site_property("bond_orders_ddec6", self.bond_orders)
+        structure.add_site_property("dipole_ddec6",self.dipoles)
         return structure
