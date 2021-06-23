@@ -686,7 +686,6 @@ def plot_slab(
     draw_unit_cell=True,
     decay=0.2,
     adsorption_sites=True,
-    find_args=None,
     inverse=False,
     find_args=None
 ):
