@@ -1,4 +1,3 @@
-# coding: utf-8
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
@@ -492,7 +491,7 @@ class DictSet(VaspInputSet):
         structure = self.structure
         incar = Incar()
         comp = structure.composition
-        elements = sorted([el for el in comp.elements if comp[el] > 0], key=lambda e: e.X)
+        elements = sorted((el for el in comp.elements if comp[el] > 0), key=lambda e: e.X)
         most_electroneg = elements[-1].symbol
         poscar = Poscar(structure)
         hubbard_u = settings.get("LDAU", False)
@@ -561,7 +560,7 @@ class DictSet(VaspInputSet):
                     del incar[key]
 
         if self.constrain_total_magmom:
-            nupdown = sum([mag if abs(mag) > 0.6 else 0 for mag in incar["MAGMOM"]])
+            nupdown = sum(mag if abs(mag) > 0.6 else 0 for mag in incar["MAGMOM"])
             incar["NUPDOWN"] = nupdown
 
         if self.use_structure_charge:
@@ -612,10 +611,10 @@ class DictSet(VaspInputSet):
         """
         nelectrons_by_element = {p.element: p.nelectrons for p in self.potcar}
         nelect = sum(
-            [
+            
                 num_atoms * nelectrons_by_element[str(el)]
                 for el, num_atoms in self.structure.composition.element_composition.items()
-            ]
+            
         )
 
         if self.use_structure_charge:
@@ -761,7 +760,7 @@ class DictSet(VaspInputSet):
         if "ENCUT" in self.incar and self.incar["ENCUT"] > 0:
             encut = self.incar["ENCUT"]
         else:
-            encut = max([i_species.enmax for i_species in self.all_input["POTCAR"]])
+            encut = max(i_species.enmax for i_species in self.all_input["POTCAR"])
         #
 
         _CUTOF = [
@@ -1133,7 +1132,7 @@ class MPStaticSet(MPRelaxSet):
         if incar.get("LDAU"):
             u = incar.get("LDAUU", [])
             j = incar.get("LDAUJ", [])
-            if sum([u[x] - j[x] for x, y in enumerate(u)]) > 0:
+            if sum(u[x] - j[x] for x, y in enumerate(u)) > 0:
                 for tag in ("LDAUU", "LDAUL", "LDAUJ"):
                     incar.update({tag: parent_incar[tag]})
             # ensure to have LMAXMIX for GGA+U static run
@@ -1713,8 +1712,8 @@ class MPNonSCFSet(MPRelaxSet):
 
         # automatic setting of nedos using the energy range and the energy step dedos
         if self.nedos == 0:
-            emax = max([eigs.max() for eigs in vasprun.eigenvalues.values()])
-            emin = min([eigs.min() for eigs in vasprun.eigenvalues.values()])
+            emax = max(eigs.max() for eigs in vasprun.eigenvalues.values())
+            emin = min(eigs.min() for eigs in vasprun.eigenvalues.values())
             self.nedos = int((emax - emin) / self.dedos)
 
         return self
@@ -2039,7 +2038,7 @@ class MVLGWSet(DictSet):
         self.reciprocal_density = reciprocal_density
         self.mode = mode.upper()
         if self.mode not in MVLGWSet.SUPPORTED_MODES:
-            raise ValueError("%s not one of the support modes : %s" % (self.mode, MVLGWSet.SUPPORTED_MODES))
+            raise ValueError(f"{self.mode} not one of the support modes : {MVLGWSet.SUPPORTED_MODES}")
         self.kwargs = kwargs
         self.copy_wavecar = copy_wavecar
         self.nbands_factor = nbands_factor
@@ -2485,7 +2484,7 @@ class MITNEBSet(MITRelaxSet):
                 d.mkdir(parents=True)
             p.write_file(str(d / "POSCAR"))
             if write_cif:
-                p.structure.to(filename=str(d / "{}.cif".format(i)))
+                p.structure.to(filename=str(d / f"{i}.cif"))
         if write_endpoint_inputs:
             end_point_param = MITRelaxSet(self.structures[0], user_incar_settings=self.user_incar_settings)
 
@@ -2769,7 +2768,7 @@ class MPSurfaceSet(MVLSlabSet):
 
         # If not a bulk calc, turn get_locpot/auto_dipole on by default
         auto_dipole = auto_dipole or not bulk
-        super(MPSurfaceSet, self).__init__(
+        super().__init__(
             structure, bulk=bulk, auto_dipole=False, **kwargs)
         # This is a hack, but should be fixed when this is ported over to
         # pymatgen to account for vasp native dipole fix
@@ -2779,7 +2778,7 @@ class MPSurfaceSet(MVLSlabSet):
 
     @property
     def incar(self):
-        incar = super(MPSurfaceSet, self).incar
+        incar = super().incar
 
         # Determine LDAU based on slab chemistry without adsorbates
         ldau_elts = {'O', 'F'}
@@ -2987,7 +2986,7 @@ def standardize_structure(structure, sym_prec=0.1, international_monoclinic=True
     vpa_new = new_structure.volume / new_structure.num_sites
 
     if abs(vpa_old - vpa_new) / vpa_old > 0.02:
-        raise ValueError("Standardizing cell failed! VPA old: {}, VPA new: {}".format(vpa_old, vpa_new))
+        raise ValueError(f"Standardizing cell failed! VPA old: {vpa_old}, VPA new: {vpa_new}")
 
     sm = StructureMatcher()
     if not sm.fit(structure, new_structure):
@@ -3054,7 +3053,7 @@ def batch_write_input(
             subdir = subfolder(s)
             d = output_dir / subdir
         else:
-            d = output_dir / "{}_{}".format(formula, i)
+            d = output_dir / f"{formula}_{i}"
         if sanitize:
             s = s.copy(sanitize=True)
         v = vasp_input_set(s, **kwargs)
